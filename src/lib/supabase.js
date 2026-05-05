@@ -53,6 +53,13 @@ export async function deleteParent(id) {
   if (error) throw error;
 }
 
+// Send a password-reset email. Standard Supabase auth flow.
+export async function sendPasswordReset(email) {
+  const redirectTo = `${window.location.origin}/`;
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) throw error;
+}
+
 export async function getMyChildren(parentId) {
   const { data, error } = await supabase.from("children").select("*").eq("parent_id", parentId).order("name");
   if (error) throw error;
