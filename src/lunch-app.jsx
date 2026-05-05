@@ -368,7 +368,7 @@ function Sidebar({ role, activePage, setActivePage }) {
   const items = role === "superadmin"
     ? [{ id: "dashboard", icon: "📊", label: "Dashboard" }, { id: "menu", icon: "🍽️", label: "Menu Editor" }, { id: "orders", icon: "📋", label: "All Orders" }, { id: "parents", icon: "👨‍👩‍👧", label: "Parents" }, { id: "students", icon: "🎒", label: "Students" }, { id: "reports", icon: "📈", label: "Reports" }, { id: "holidays", icon: "🚫", label: "Blocked Days" }, { id: "locations", icon: "🏫", label: "Locations" }, { id: "drinks", icon: "🥤", label: "Drinks" }, { id: "notifications", icon: "🔔", label: "Notifications" }]
     : role === "schooladmin"
-    ? [{ id: "dashboard", icon: "📊", label: "Today's Orders" }, { id: "weekly", icon: "📅", label: "Weekly View" }, { id: "students", icon: "🎒", label: "My Students" }, { id: "reports", icon: "📈", label: "Reports" }, { id: "holidays", icon: "🚫", label: "Blocked Days" }]
+    ? [{ id: "dashboard", icon: "📊", label: "Today's Orders" }, { id: "weekly", icon: "📅", label: "Weekly View" }, { id: "students", icon: "🎒", label: "My Students" }, { id: "parents", icon: "👨‍👩‍👧", label: "Parents" }, { id: "reports", icon: "📈", label: "Reports" }, { id: "holidays", icon: "🚫", label: "Blocked Days" }]
     : [{ id: "dashboard", icon: "🏠", label: "Home" }, { id: "order", icon: "📅", label: "Order Lunches" }, { id: "myorders", icon: "📋", label: "My Orders" }, { id: "profile", icon: "👤", label: "My Profile" }, { id: "children", icon: "🎒", label: "My Children" }];
   return (
     <div className="sidebar">
@@ -643,40 +643,99 @@ function SAOrders() {
 }
 
 function SAParents() {
-  const { parents, orders, actions } = useApp();
+  const { parents, orders, locations, actions } = useApp();
   const [view, setView] = useState(null);
+  const [edit, setEdit] = useState(null);
+  const [editForm, setEditForm] = useState({ name: "", phone: "", location: "" });
+  const [busy, setBusy] = useState(false);
+  const [resetBusyId, setResetBusyId] = useState(null);
+  const [error, setError] = useState("");
+  const [flash, setFlash] = useState("");
+
   const del = async (id) => {
     if (!confirm("Delete this parent and all their data?")) return;
     try { await actions.deleteParent(id); }
     catch (err) { alert(err.message || "Failed to delete."); }
   };
+
+  const openEdit = (p) => {
+    setError("");
+    setEdit(p);
+    setEditForm({ name: p.name || "", phone: p.phone || "", location: p.location || "" });
+  };
+  const saveEdit = async () => {
+    setError("");
+    if (!editForm.name.trim()) return setError("Name is required.");
+    if (!editForm.phone.trim()) return setError("Phone is required for parents.");
+    if (!editForm.location) return setError("Location is required.");
+    setBusy(true);
+    try {
+      await actions.updateProfile(edit.id, { name: editForm.name.trim(), phone: editForm.phone.trim(), location: editForm.location });
+      setFlash(`✓ Updated ${editForm.name.trim()}`);
+      setTimeout(() => setFlash(""), 2500);
+      setEdit(null);
+    } catch (err) {
+      setError(err.message || "Failed to save.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendReset = async (p) => {
+    if (!p.email) return alert("This parent has no email on file.");
+    if (!confirm(`Send a password reset email to ${p.email}?`)) return;
+    setResetBusyId(p.id);
+    setError("");
+    try {
+      await actions.sendPasswordReset(p.email);
+      setFlash(`✓ Password reset email sent to ${p.email}`);
+      setTimeout(() => setFlash(""), 3500);
+    } catch (err) {
+      setError(err.message || "Failed to send reset email.");
+    } finally {
+      setResetBusyId(null);
+    }
+  };
+
   return (
     <div>
       <div className="page-title">👨‍👩‍👧 Parents</div>
-      <div className="page-subtitle">All registered parent accounts.</div>
+      <div className="page-subtitle">All registered parent accounts. Edit contact info, send a password reset, or remove an account.</div>
+      {flash && <div className="success-banner">{flash}</div>}
+      {error && !edit && <div style={{ background: "#FDEEF3", border: "1px solid #F5B8C9", borderRadius: "var(--radius-sm)", padding: "10px 14px", fontSize: 13, color: "var(--danger)", marginBottom: 16 }}>{error}</div>}
       <div className="card">
         {parents.length === 0 ? <div className="empty-state"><div className="empty-icon">📭</div><div className="empty-text">No parents yet</div></div> : (
           <div className="table-wrap"><table>
-            <thead><tr><th>Name</th><th>Location</th><th>Children</th><th>Orders</th><th></th></tr></thead>
+            <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Location</th><th>Children</th><th>Orders</th><th></th></tr></thead>
             <tbody>{parents.map(p => (
               <tr key={p.id}>
                 <td style={{ fontWeight: 600 }}>{p.name}</td>
+                <td style={{ fontSize: 12 }}>{p.email || <span style={{ color: "var(--text3)" }}>—</span>}</td>
+                <td style={{ fontSize: 12 }}>{p.phone || <span style={{ color: "var(--text3)" }}>—</span>}</td>
                 <td><span className="tag tag-teal" style={{ fontSize: 10 }}>{p.location?.split(" ")[0]}</span></td>
                 <td>{p.children?.length || 0}</td>
                 <td>{orders.filter(o => o.parentId === p.id).length}</td>
-                <td><button className="btn btn-ghost btn-xs" onClick={() => setView(p)} style={{ marginRight: 6 }}>View</button><button className="btn btn-danger btn-xs" onClick={() => del(p.id)}>Delete</button></td>
+                <td style={{ whiteSpace: "nowrap" }}>
+                  <button className="btn btn-ghost btn-xs" onClick={() => setView(p)} style={{ marginRight: 4 }}>View</button>
+                  <button className="btn btn-secondary btn-xs" onClick={() => openEdit(p)} style={{ marginRight: 4 }}>Edit</button>
+                  <button className="btn btn-ghost btn-xs" onClick={() => sendReset(p)} disabled={resetBusyId === p.id} style={{ marginRight: 4 }}>{resetBusyId === p.id ? "Sending…" : "Reset PW"}</button>
+                  <button className="btn btn-danger btn-xs" onClick={() => del(p.id)}>Delete</button>
+                </td>
               </tr>
             ))}</tbody>
           </table></div>
         )}
       </div>
+
       {view && (
         <div className="modal-overlay" onClick={() => setView(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-title">{view.name}<button className="modal-close" onClick={() => setView(null)}>×</button></div>
             <div className="grid2">
+              <div><b>Email</b><br /><span style={{ fontSize: 13 }}>{view.email || "N/A"}</span></div>
               <div><b>Phone</b><br /><span style={{ fontSize: 13 }}>{view.phone || "N/A"}</span></div>
               <div><b>Location</b><br /><span style={{ fontSize: 13 }}>{view.location}</span></div>
+              <div><b>Account Created</b><br /><span style={{ fontSize: 13 }}>{view.created_at ? formatDate(view.created_at.slice(0, 10)) : "—"}</span></div>
             </div>
             <div className="divider" />
             <b>Children</b>
@@ -689,6 +748,38 @@ function SAParents() {
                 <span>{formatDate(o.date)} — {o.childName}</span><span style={{ color: "var(--text2)" }}>{o.mainItem} (${(o.price || 0).toFixed(2)})</span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {edit && (
+        <div className="modal-overlay" onClick={() => !busy && setEdit(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Edit Parent<button className="modal-close" onClick={() => !busy && setEdit(null)}>×</button></div>
+            <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>Email is managed by Supabase Auth and isn't editable here. To change a parent's email, ask them to update it in their profile or remove and re-invite the account.</div>
+            {error && <div style={{ background: "#FDEEF3", border: "1px solid #F5B8C9", borderRadius: "var(--radius-sm)", padding: "10px 14px", fontSize: 13, color: "var(--danger)", marginBottom: 12 }}>{error}</div>}
+            <div className="form-group">
+              <label className="form-label">Name</label>
+              <input className="form-input" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Email <span style={{ fontWeight: 400, textTransform: "none", color: "var(--text3)" }}>(read-only)</span></label>
+              <input className="form-input" value={edit.email || ""} readOnly style={{ background: "var(--bg2)", color: "var(--text2)" }} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Phone</label>
+              <input className="form-input" value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Location</label>
+              <select className="form-input form-select" value={editForm.location} onChange={e => setEditForm({ ...editForm, location: e.target.value })}>
+                {locations.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
+            <div className="flex-gap" style={{ justifyContent: "flex-end", marginTop: 16 }}>
+              <button className="btn btn-ghost" onClick={() => setEdit(null)} disabled={busy}>Cancel</button>
+              <button className="btn btn-primary" onClick={saveEdit} disabled={busy}>{busy ? "Saving…" : "Save Changes"}</button>
+            </div>
           </div>
         </div>
       )}
@@ -1234,6 +1325,7 @@ function SchoolAdminPages({ page }) {
     dashboard: <SchoolToday />,
     weekly: <SchoolWeekly />,
     students: <SchoolStudents />,
+    parents: <SchoolParents />,
     reports: <SchoolReports />,
     holidays: <SchoolHolidays />,
   };
@@ -1324,6 +1416,32 @@ function SchoolStudents() {
                 <td style={{ fontWeight: 600 }}>{c.name}</td><td>{c.grade}</td>
                 <td>{hasDietary(c.dietary) ? <span className="tag tag-gold" style={{ maxWidth: 180, whiteSpace: "normal" }}>{formatDietary(c.dietary)}</span> : "—"}</td>
                 <td>{c.parentName}</td><td>{c.orderCount}</td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SchoolParents() {
+  const { profile, parents } = useApp();
+  const myParents = parents.filter(p => p.location === profile.location);
+  return (
+    <div>
+      <div className="page-title">👨‍👩‍👧 Parents</div>
+      <div className="page-subtitle">{profile.location} · {myParents.length} parent{myParents.length === 1 ? "" : "s"} — contact info is read-only.</div>
+      <div className="card">
+        {myParents.length === 0 ? <div className="empty-state"><div className="empty-icon">📭</div><div className="empty-text">No parents at your location yet</div></div> : (
+          <div className="table-wrap"><table>
+            <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Children</th></tr></thead>
+            <tbody>{myParents.map(p => (
+              <tr key={p.id}>
+                <td style={{ fontWeight: 600 }}>{p.name}</td>
+                <td style={{ fontSize: 12 }}>{p.email ? <a href={`mailto:${p.email}`} style={{ color: "var(--secondary)", textDecoration: "none" }}>{p.email}</a> : <span style={{ color: "var(--text3)" }}>—</span>}</td>
+                <td style={{ fontSize: 12 }}>{p.phone ? <a href={`tel:${p.phone}`} style={{ color: "var(--secondary)", textDecoration: "none" }}>{p.phone}</a> : <span style={{ color: "var(--text3)" }}>—</span>}</td>
+                <td>{(p.children || []).map(c => c.name).join(", ") || <span style={{ color: "var(--text3)" }}>None</span>}</td>
               </tr>
             ))}</tbody>
           </table></div>
