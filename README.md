@@ -152,3 +152,4 @@ After deployment, walk through this end-to-end:
 **"Order cutoff has passed for this date"** — the DB trigger is rejecting the insert. Check the user's local clock; the cutoff uses server-side `now()` against `order_date::timestamptz + interval '8 hours'`.
 
 **Realtime updates aren't arriving** — the channels in `AppContext.jsx` need Supabase
+<!-- Build trigger: 20260505T125228Z -->
