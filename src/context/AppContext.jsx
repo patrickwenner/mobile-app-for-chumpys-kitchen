@@ -82,7 +82,6 @@ function normalizeOrder(o) {
     price: Number(o.item_price) || 0,
     drink: o.drink,
     location: o.location,
-    // Denormalized fields from order_details view (may be undefined for raw rows)
     childName: o.child_name,
     childGrade: o.child_grade,
     parentName: o.parent_name,
@@ -100,33 +99,22 @@ export function AppProvider({ children }) {
   const [profile, setProfile]       = useState(null);
   const [loading, setLoading]       = useState(true);
 
-  // Shared data
-  // Note: `myChildren` (not `children`) because `children` here would shadow
-  // the React prop `children` passed into <AppProvider>{children}</AppProvider>.
   const [menu, setMenu]             = useState({});
   const [orders, setOrders]         = useState([]);
   const [parents, setParents]       = useState([]);
-  const [myChildren, setMyChildren] = useState([]);   // current parent's children
+  const [myChildren, setMyChildren] = useState([]);
   const [blockedDays, setBlockedDays] = useState({});
   const [notifications, setNotifications] = useState([]);
-  const [locations, setLocations]   = useState([]);   // ['Episcopal...', 'Holly...']
-  const [drinks, setDrinks]         = useState([]);   // [{id, name, emoji}, ...]
-  const [repeatOrders, setRepeatOrders] = useState([]); // current parent's active repeats
+  const [locations, setLocations]   = useState([]);
+  const [drinks, setDrinks]         = useState([]);
+  const [repeatOrders, setRepeatOrders] = useState([]);
 
-  // ── Auth listener ───────────────────────────────────────────
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
     return () => subscription.unsubscribe();
   }, []);
 
-  // ── Load profile + data when session changes ────────────────
   useEffect(() => {
     if (!session) {
       setProfile(null);
@@ -143,8 +131,6 @@ export function AppProvider({ children }) {
       const prof = normalizeProfile(profRaw);
       setProfile(prof);
 
-      // Date range: 4 weeks back, ~1 year forward.
-      // Wide enough to show full 2-week rotations replicated for many months.
       const from = offsetDate(-28);
       const to   = offsetDate(365);
 
@@ -189,4 +175,207 @@ export function AppProvider({ children }) {
     }
   };
 
-  // ── Real-time subscriptions ────────
+  useEffect(() => {
+    if (!session) return;
+
+    const orderSub = supabase
+      .channel("orders-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => refreshOrders())
+      .subscribe();
+
+    const menuSub = supabase
+      .channel("menu-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_days" }, () => refreshMenu())
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => refreshMenu())
+      .subscribe();
+
+    const blockedSub = supabase
+      .channel("blocked-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "blocked_days" }, () => {
+        getBlockedDays().then(setBlockedDays);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(orderSub);
+      supabase.removeChannel(menuSub);
+      supabase.removeChannel(blockedSub);
+    };
+  }, [session, profile]);
+
+  const refreshMenu = useCallback(async () => {
+    const from = offsetDate(-28);
+    const to   = offsetDate(365);
+    const data = await getMenuRange(from, to);
+    setMenu(data);
+  }, []);
+
+  const refreshOrders = useCallback(async () => {
+    if (!profile) return;
+    let data;
+    if (profile.role === "parent")            data = await getOrders({ parentId: profile.id });
+    else if (profile.role === "schooladmin")  data = await getOrders({ location: profile.location });
+    else                                      data = await getOrders();
+    setOrders(data.map(normalizeOrder));
+  }, [profile]);
+
+  const refreshParents = useCallback(async () => {
+    if (profile?.role !== "superadmin") return;
+    const data = await getAllParents();
+    setParents(data.map(normalizeProfile));
+  }, [profile]);
+
+  const refreshChildren = useCallback(async () => {
+    if (!profile || profile.role !== "parent") return;
+    const data = await getMyChildren(profile.id);
+    setMyChildren(data.map(normalizeChild));
+  }, [profile]);
+
+  const refreshProfile = useCallback(async () => {
+    const data = await getMyProfile();
+    setProfile(normalizeProfile(data));
+  }, []);
+
+  const refreshLocations = useCallback(async () => {
+    setLocations(await getLocations());
+  }, []);
+
+  const refreshDrinks = useCallback(async () => {
+    setDrinks(await getDrinks());
+  }, []);
+
+  const refreshRepeatOrders = useCallback(async () => {
+    if (!profile || profile.role !== "parent") return;
+    setRepeatOrders(await getMyRepeatOrders(profile.id));
+  }, [profile]);
+
+  const refreshNotifications = useCallback(async () => {
+    setNotifications(await getNotifications());
+  }, []);
+
+  const actions = {
+    signIn: async (email, password) => { await sbSignIn(email, password); },
+    signOut: async () => { await sbSignOut(); },
+    registerParent: async (args) => { await sbRegisterParent(args); },
+
+    saveMenu: async (date, items) => {
+      await saveMenuDay(date, items);
+      try { await notifyMenuChange(date, items); } catch (e) { console.warn("notify failed:", e); }
+      await refreshMenu();
+      await refreshNotifications();
+    },
+    applyMenuRotation: async (sourceStart, targetStart, weeksCount) => {
+      const written = await sbApplyMenuRotation(sourceStart, targetStart, weeksCount);
+      await refreshMenu();
+      return written;
+    },
+
+    placeOrder: async (args) => { await sbPlaceOrder(args); await refreshOrders(); },
+    cancelOrder: async (id) => { await sbCancelOrder(id); await refreshOrders(); },
+
+    addBlockedDay: async (args) => {
+      await sbAddBlockedDay(args);
+      setBlockedDays(await getBlockedDays());
+    },
+    addBlockedDayRange: async (args) => {
+      const rows = await sbAddBlockedDayRange(args);
+      setBlockedDays(await getBlockedDays());
+      return rows.length;
+    },
+    removeBlockedDay: async (id) => {
+      await sbRemoveBlockedDay(id);
+      setBlockedDays(await getBlockedDays());
+    },
+    removeBlockedDays: async (ids) => {
+      await sbRemoveBlockedDays(ids);
+      setBlockedDays(await getBlockedDays());
+    },
+
+    addLocation: async (name) => { await sbAddLocation(name); await refreshLocations(); },
+    renameLocation: async (oldName, newName) => {
+      await sbRenameLocation(oldName, newName);
+      await refreshLocations();
+      await refreshParents();
+    },
+    deleteLocation: async (name) => { await sbDeleteLocation(name); await refreshLocations(); },
+
+    addDrink: async (args) => { await sbAddDrink(args); await refreshDrinks(); },
+    updateDrink: async (id, updates) => { await sbUpdateDrink(id, updates); await refreshDrinks(); },
+    deleteDrink: async (id) => { await sbDeleteDrink(id); await refreshDrinks(); },
+
+    upsertChild: async (child) => {
+      const row = {
+        ...(child.id ? { id: child.id } : {}),
+        parent_id: child.parent_id || profile.id,
+        name: child.name,
+        grade: child.grade,
+        dietary_selected: child.dietary?.selected || [],
+        dietary_other:    child.dietary?.otherDetails || "",
+      };
+      await sbUpsertChild(row);
+      await refreshChildren();
+      await refreshParents();
+    },
+    deleteChild: async (id) => {
+      await sbDeleteChild(id);
+      await refreshChildren();
+      await refreshParents();
+    },
+
+    upsertRepeatOrder: async (args) => {
+      await sbUpsertRepeatOrder(args);
+      await refreshRepeatOrders();
+      await refreshOrders();
+    },
+    deleteRepeatOrder: async (id) => {
+      await sbDeleteRepeatOrder(id);
+      await refreshRepeatOrders();
+      await refreshOrders();
+    },
+    syncMyRepeatOrders: async () => {
+      const n = await sbSyncMyRepeatOrders();
+      await refreshOrders();
+      return n;
+    },
+
+    updateProfile: async (id, updates) => {
+      const row = { ...updates };
+      delete row.email;
+      delete row.children;
+      delete row.password;
+      delete row.repeatDays;
+      await sbUpdateProfile(id, row);
+      if (id === profile?.id) await refreshProfile();
+      await refreshParents();
+    },
+    deleteParent: async (id) => {
+      await sbDeleteParent(id);
+      await refreshParents();
+    },
+  };
+
+  const value = {
+    session, profile, loading,
+    menu, orders, parents,
+    children: myChildren,
+    blockedDays, notifications, locations, drinks, repeatOrders,
+    refreshMenu, refreshOrders, refreshParents, refreshChildren,
+    refreshProfile, refreshLocations, refreshDrinks, refreshRepeatOrders, refreshNotifications,
+    reloadAll: loadAll,
+    actions,
+  };
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+}
+
+export function useApp() {
+  const ctx = useContext(AppContext);
+  if (!ctx) throw new Error("useApp must be used inside <AppProvider>");
+  return ctx;
+}
+
+function offsetDate(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split("T")[0];
+}
