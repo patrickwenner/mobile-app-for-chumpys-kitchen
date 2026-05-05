@@ -792,7 +792,8 @@ function SAStudents() {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
-  const all = parents.flatMap(p => (p.children || []).map(c => ({ ...c, parentName: p.name, location: p.location })));
+  const [parentView, setParentView] = useState(null);
+  const all = parents.flatMap(p => (p.children || []).map(c => ({ ...c, parentId: p.id, parentName: p.name, location: p.location })));
 
   const removeStudent = async (c) => {
     setError("");
@@ -811,6 +812,11 @@ function SAStudents() {
     } finally {
       setBusyId(null);
     }
+  };
+
+  const openParent = (parentId) => {
+    const p = parents.find(x => x.id === parentId);
+    if (p) setParentView(p);
   };
 
   return (
@@ -836,13 +842,42 @@ function SAStudents() {
                   <td>{hasDietary(c.dietary) ? <span className="tag tag-gold" style={{ maxWidth: 180, whiteSpace: "normal" }}>{formatDietary(c.dietary)}</span> : "—"}</td>
                   <td>{c.parentName}</td><td><span className="tag tag-teal" style={{ fontSize: 10 }}>{c.location?.split(" ")[0]}</span></td>
                   <td>{orderCount}</td>
-                  <td><button className="btn btn-danger btn-xs" onClick={() => removeStudent(c)} disabled={busyId === c.id}>{busyId === c.id ? "Removing…" : "Delete"}</button></td>
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    <button className="btn btn-secondary btn-xs" onClick={() => openParent(c.parentId)} style={{ marginRight: 4 }}>Parent</button>
+                    <button className="btn btn-danger btn-xs" onClick={() => removeStudent(c)} disabled={busyId === c.id}>{busyId === c.id ? "Removing…" : "Delete"}</button>
+                  </td>
                 </tr>
               );
             })}</tbody>
           </table></div>
         )}
       </div>
+
+      {parentView && (
+        <div className="modal-overlay" onClick={() => setParentView(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">{parentView.name}<button className="modal-close" onClick={() => setParentView(null)}>×</button></div>
+            <div className="grid2">
+              <div><b>Email</b><br /><span style={{ fontSize: 13 }}>{parentView.email ? <a href={`mailto:${parentView.email}`} style={{ color: "var(--secondary)", textDecoration: "none" }}>{parentView.email}</a> : "N/A"}</span></div>
+              <div><b>Phone</b><br /><span style={{ fontSize: 13 }}>{parentView.phone ? <a href={`tel:${parentView.phone}`} style={{ color: "var(--secondary)", textDecoration: "none" }}>{parentView.phone}</a> : "N/A"}</span></div>
+              <div><b>Location</b><br /><span style={{ fontSize: 13 }}>{parentView.location}</span></div>
+              <div><b>Account Created</b><br /><span style={{ fontSize: 13 }}>{parentView.created_at ? formatDate(parentView.created_at.slice(0, 10)) : "—"}</span></div>
+            </div>
+            <div className="divider" />
+            <b>Children</b>
+            {(parentView.children || []).map(c => <div key={c.id} className="child-card" style={{ marginTop: 8 }}><b>{c.name}</b><div style={{ fontSize: 12, color: "var(--text2)" }}>{c.grade} • {formatDietary(c.dietary)}</div></div>)}
+            {(!parentView.children || parentView.children.length === 0) && <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 8 }}>No children added.</div>}
+            <div className="divider" />
+            <b>Recent Orders</b>
+            {orders.filter(o => o.parentId === parentView.id).slice(-5).map(o => (
+              <div key={o.id} style={{ fontSize: 13, padding: "5px 0", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
+                <span>{formatDate(o.date)} — {o.childName}</span><span style={{ color: "var(--text2)" }}>{o.mainItem} (${(o.price || 0).toFixed(2)})</span>
+              </div>
+            ))}
+            <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 12, textAlign: "right" }}>For full edit/reset access, open the Parents page.</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1396,31 +1431,54 @@ function SchoolWeekly() {
 }
 
 function SchoolStudents() {
-  const { profile, orders } = useApp();
+  const { profile, orders, parents } = useApp();
+  const [parentView, setParentView] = useState(null);
   const seen = new Map();
   for (const o of orders.filter(x => x.location === profile.location)) {
     if (!seen.has(o.childId)) {
-      seen.set(o.childId, { id: o.childId, name: o.childName, grade: o.childGrade, parentName: o.parentName, dietary: o.dietary, orderCount: 1 });
+      seen.set(o.childId, { id: o.childId, name: o.childName, grade: o.childGrade, parentId: o.parentId, parentName: o.parentName, dietary: o.dietary, orderCount: 1 });
     } else { seen.get(o.childId).orderCount++; }
   }
   const students = [...seen.values()].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const openParent = (parentId) => {
+    const p = parents.find(x => x.id === parentId);
+    if (p) setParentView(p);
+  };
   return (
     <div>
       <div className="page-title">🎒 My Students</div><div className="page-subtitle">{profile.location} · {students.length} student{students.length !== 1 ? "s" : ""} with orders</div>
       <div className="card">
         {students.length === 0 ? <div className="empty-state"><div className="empty-icon">🎒</div><div className="empty-text">No student orders yet</div></div> : (
           <div className="table-wrap"><table>
-            <thead><tr><th>Student</th><th>Grade</th><th>Dietary</th><th>Parent</th><th>Orders</th></tr></thead>
+            <thead><tr><th>Student</th><th>Grade</th><th>Dietary</th><th>Parent</th><th>Orders</th><th></th></tr></thead>
             <tbody>{students.map(c => (
               <tr key={c.id}>
                 <td style={{ fontWeight: 600 }}>{c.name}</td><td>{c.grade}</td>
                 <td>{hasDietary(c.dietary) ? <span className="tag tag-gold" style={{ maxWidth: 180, whiteSpace: "normal" }}>{formatDietary(c.dietary)}</span> : "—"}</td>
                 <td>{c.parentName}</td><td>{c.orderCount}</td>
+                <td><button className="btn btn-secondary btn-xs" onClick={() => openParent(c.parentId)} disabled={!parents.find(p => p.id === c.parentId)}>Parent</button></td>
               </tr>
             ))}</tbody>
           </table></div>
         )}
       </div>
+
+      {parentView && (
+        <div className="modal-overlay" onClick={() => setParentView(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">{parentView.name}<button className="modal-close" onClick={() => setParentView(null)}>×</button></div>
+            <div className="grid2">
+              <div><b>Email</b><br /><span style={{ fontSize: 13 }}>{parentView.email ? <a href={`mailto:${parentView.email}`} style={{ color: "var(--secondary)", textDecoration: "none" }}>{parentView.email}</a> : "N/A"}</span></div>
+              <div><b>Phone</b><br /><span style={{ fontSize: 13 }}>{parentView.phone ? <a href={`tel:${parentView.phone}`} style={{ color: "var(--secondary)", textDecoration: "none" }}>{parentView.phone}</a> : "N/A"}</span></div>
+            </div>
+            <div className="divider" />
+            <b>Children</b>
+            {(parentView.children || []).map(c => <div key={c.id} className="child-card" style={{ marginTop: 8 }}><b>{c.name}</b><div style={{ fontSize: 12, color: "var(--text2)" }}>{c.grade} • {formatDietary(c.dietary)}</div></div>)}
+            {(!parentView.children || parentView.children.length === 0) && <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 8 }}>No children added.</div>}
+            <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 12, textAlign: "right" }}>Read-only — contact the parent directly using the email or phone above.</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
