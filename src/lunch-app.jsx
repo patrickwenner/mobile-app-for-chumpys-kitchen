@@ -1939,4 +1939,31 @@ function DietaryPicker({ value, onChange }) {
                 borderColor: active ? "var(--primary)" : "var(--border)",
               }}>
               {active && <span style={{ fontSize: 11 }}>✓</span>}
-       
+              {opt}
+            </button>
+          );
+        })}
+        <button type="button" onClick={toggleOther}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "6px 14px", borderRadius: 20, fontSize: 13, fontWeight: 600,
+            cursor: "pointer", border: "1.5px solid", transition: "all 0.15s",
+            background: showOther ? "var(--secondary)" : "var(--surface)",
+            color: showOther ? "white" : "var(--text2)",
+            borderColor: showOther ? "var(--secondary)" : "var(--border)",
+          }}>
+          {showOther && <span style={{ fontSize: 11 }}>✓</span>}
+          Other / Not Listed
+        </button>
+      </div>
+      {showOther && (
+        <div style={{ marginTop: 8 }}>
+          <input className="form-input" placeholder="Please describe the restriction(s)…" value={val.otherDetails || ""} onChange={e => setOther(e.target.value)} />
+        </div>
+      )}
+      {(val.selected.length === 0) && (
+        <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 6 }}>No restrictions selected — child has no dietary restrictions.</div>
+      )}
+    </div>
+  );
+}
