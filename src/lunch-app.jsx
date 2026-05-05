@@ -5,7 +5,6 @@ import { useApp } from "./context/AppContext";
 const DIETARY_OPTIONS = ["Vegetarian", "Vegan", "Gluten-Free", "Nut-Free", "Dairy-Free", "Halal", "Kosher"];
 const GRADES = ["Pre-K", "Kindergarten", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
 const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-// Drink options come from useApp().drinks (managed in Super Admin → Drinks).
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function todayStr() { return new Date().toISOString().split("T")[0]; }
@@ -44,14 +43,10 @@ function formatDietary(dietary) {
   return parts.length > 0 ? parts.join(", ") : "None";
 }
 
-// Group consecutive blocked days that share the same label + location into ranges.
-// Input:  the blockedDays object from AppContext (keyed by 'YYYY-MM-DD')
-// Output: [{ startDate, endDate, label, locations, ids: [uuid, ...] }, ...]
 function groupBlockedDays(blockedDays) {
   const entries = Object.entries(blockedDays || {})
     .map(([date, info]) => ({ date, ...info }))
     .sort((a, b) => a.date.localeCompare(b.date));
-
   const groups = [];
   for (const e of entries) {
     const last = groups[groups.length - 1];
@@ -65,13 +60,7 @@ function groupBlockedDays(blockedDays) {
       last.endDate = e.date;
       last.ids.push(e.id);
     } else {
-      groups.push({
-        startDate: e.date,
-        endDate: e.date,
-        label: e.label,
-        locations: e.locations,
-        ids: [e.id],
-      });
+      groups.push({ startDate: e.date, endDate: e.date, label: e.label, locations: e.locations, ids: [e.id] });
     }
   }
   return groups;
@@ -158,7 +147,6 @@ const css = `
   .tag-green { background: #E6FAF5; color: var(--accent2); }
   .tag-gold { background: #FFF8E1; color: #C8960A; }
   .tag-gray { background: var(--bg2); color: var(--text2); }
-  /* CALENDAR */
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
   .cal-header { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 8px; }
   .cal-day-label { text-align: center; font-size: 11px; font-weight: 800; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; padding: 4px; }
@@ -176,7 +164,6 @@ const css = `
   .cal-ordered { font-size: 10px; background: var(--secondary); color: white; padding: 2px 7px; border-radius: 20px; font-weight: 700; display: inline-block; margin-top: 4px; }
   .menu-item-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
   .menu-item-row:last-child { border-bottom: none; }
-  /* ORDER ITEM PICKER */
   .item-pick { border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; cursor: pointer; transition: all 0.15s; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; }
   .item-pick:hover { border-color: var(--primary); background: #FFF5F0; }
   .item-pick.selected { border-color: var(--secondary); background: #E6FAF8; }
@@ -184,12 +171,10 @@ const css = `
   .item-pick.selected .item-pick-radio { background: var(--secondary); border-color: var(--secondary); }
   .item-pick-inner { width: 8px; height: 8px; border-radius: 50%; background: white; }
   .item-pick-name { font-weight: 600; font-size: 14px; color: var(--text); }
-  /* REPEAT */
   .repeat-section { background: #F0FFF8; border: 2px solid var(--accent2); border-radius: var(--radius-sm); padding: 16px; margin-top: 16px; }
   .repeat-title { font-weight: 700; font-size: 14px; color: #059669; margin-bottom: 8px; }
   .day-chip { display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1.5px solid var(--border); background: var(--surface); color: var(--text2); transition: all 0.15s; margin: 3px; }
   .day-chip.selected { background: var(--primary); color: white; border-color: var(--primary); }
-  /* LOGIN */
   .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #FFF8F3 0%, #FFF0E6 50%, #E6FAF8 100%); }
   .login-card { background: var(--surface); border-radius: 24px; padding: 40px; width: 100%; max-width: 420px; box-shadow: var(--shadow-lg); border: 1.5px solid var(--border); }
   .login-logo { text-align: center; margin-bottom: 28px; }
@@ -202,12 +187,10 @@ const css = `
   .login-error { background: #FDEEF3; border: 1px solid #F5B8C9; border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; color: var(--danger); margin-bottom: 16px; }
   .register-link { text-align: center; font-size: 13px; color: var(--text2); margin-top: 16px; }
   .register-link span { color: var(--primary); font-weight: 600; cursor: pointer; }
-  /* MODAL */
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
   .modal { background: var(--surface); border-radius: 20px; padding: 28px; max-width: 500px; width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
   .modal-title { font-family: 'Nunito', sans-serif; font-weight: 900; font-size: 22px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; }
   .modal-close { background: var(--bg2); border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 18px; color: var(--text2); display: flex; align-items: center; justify-content: center; }
-  /* MISC */
   .divider { height: 1px; background: var(--border); margin: 16px 0; }
   .flex-between { display: flex; align-items: center; justify-content: space-between; }
   .flex-gap { display: flex; align-items: center; gap: 10px; }
@@ -235,7 +218,6 @@ const css = `
   }
 `;
 
-// ─── ROOT ─────────────────────────────────────────────────────────────────────
 export default function App() {
   const { session, profile, loading, actions } = useApp();
   const [activePage, setActivePage] = useState("dashboard");
@@ -274,7 +256,6 @@ export default function App() {
   );
 }
 
-// ─── LOGIN / REGISTER ─────────────────────────────────────────────────────────
 function LoginScreen() {
   const { actions } = useApp();
   const [email, setEmail] = useState("");
@@ -287,13 +268,9 @@ function LoginScreen() {
     setError("");
     if (!email || !password) return setError("Please enter your email and password.");
     setSubmitting(true);
-    try {
-      await actions.signIn(email, password);
-    } catch (err) {
-      setError(err.message || "Invalid credentials.");
-    } finally {
-      setSubmitting(false);
-    }
+    try { await actions.signIn(email, password); }
+    catch (err) { setError(err.message || "Invalid credentials."); }
+    finally { setSubmitting(false); }
   };
 
   if (showRegister) return <RegisterScreen onBack={() => setShowRegister(false)} />;
@@ -334,15 +311,9 @@ function RegisterScreen({ onBack }) {
     if (!form.phone || !form.phone.trim()) return setError("A contact phone number is required.");
     if (!form.location) return setError("Please choose a location.");
     setSubmitting(true);
-    try {
-      await actions.registerParent(form);
-      // Supabase will email a confirmation if confirmations are on; otherwise the auth listener
-      // in AppContext picks up the new session and we're in.
-    } catch (err) {
-      setError(err.message || "Registration failed.");
-    } finally {
-      setSubmitting(false);
-    }
+    try { await actions.registerParent(form); }
+    catch (err) { setError(err.message || "Registration failed."); }
+    finally { setSubmitting(false); }
   };
 
   return (
@@ -372,7 +343,6 @@ function RegisterScreen({ onBack }) {
   );
 }
 
-// ─── TOPBAR / SIDEBAR ─────────────────────────────────────────────────────────
 function TopBar({ role, name, onLogout }) {
   const bc = role === "schooladmin" ? "school" : role === "parent" ? "parent" : "";
   const rl = role === "superadmin" ? "Super Admin" : role === "schooladmin" ? "School Admin" : "Parent";
@@ -411,9 +381,6 @@ function Sidebar({ role, activePage, setActivePage }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SUPER ADMIN
-// ═══════════════════════════════════════════════════════════════════════════════
 function SuperAdminPages({ page }) {
   const map = {
     dashboard: <SADashboard />,
@@ -482,7 +449,6 @@ function SAMenuEditor() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  // Rotation modal state
   const [rotationOpen, setRotationOpen] = useState(false);
   const [rotationWeeks, setRotationWeeks] = useState(12);
   const [rotationBusy, setRotationBusy] = useState(false);
@@ -501,21 +467,16 @@ function SAMenuEditor() {
     if (!rotationWeeks || rotationWeeks < 1) return setRotationError("Enter a number of weeks (1 or more).");
     setRotationBusy(true);
     try {
-      // Source = currently visible 2 weeks. Target starts 2 weeks after.
-      const sourceStart = weekDates[0];               // Monday of week 1 of pattern
+      const sourceStart = weekDates[0];
       const targetStartDate = new Date(sourceStart + "T12:00:00");
       targetStartDate.setDate(targetStartDate.getDate() + 14);
       const targetStart = targetStartDate.toISOString().split("T")[0];
-
       const written = await actions.applyMenuRotation(sourceStart, targetStart, Number(rotationWeeks));
       setRotationOpen(false);
       setSaved(`✓ Pattern applied to ${written} weekday${written === 1 ? "" : "s"}!`);
       setTimeout(() => setSaved(false), 3000);
-    } catch (err) {
-      setRotationError(err.message || "Failed to apply pattern.");
-    } finally {
-      setRotationBusy(false);
-    }
+    } catch (err) { setRotationError(err.message || "Failed to apply pattern."); }
+    finally { setRotationBusy(false); }
   };
 
   const openEdit = (ds) => {
@@ -527,21 +488,15 @@ function SAMenuEditor() {
   const addItem = () => setEditItems(items => [...items, { id: "ni" + Date.now(), name: "", price: "" }]);
   const removeItem = (idx) => setEditItems(items => items.filter((_, i) => i !== idx));
   const saveEdit = async () => {
-    const cleaned = editItems
-      .filter(i => i.name.trim())
-      .map(i => ({ name: i.name.trim(), price: parseFloat(i.price) || 0 }));
-    setBusy(true);
-    setError("");
+    const cleaned = editItems.filter(i => i.name.trim()).map(i => ({ name: i.name.trim(), price: parseFloat(i.price) || 0 }));
+    setBusy(true); setError("");
     try {
       await actions.saveMenu(editDay, cleaned);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
       setEditDay(null);
-    } catch (err) {
-      setError(err.message || "Failed to save menu.");
-    } finally {
-      setBusy(false);
-    }
+    } catch (err) { setError(err.message || "Failed to save menu."); }
+    finally { setBusy(false); }
   };
 
   return (
@@ -554,7 +509,7 @@ function SAMenuEditor() {
         <span style={{ fontWeight: 700 }}>{formatDate(weekDates[0])} – {formatDate(weekDates[6])}</span>
         <button className="btn btn-ghost btn-sm" onClick={() => setWeekOffset(w => w + 1)}>Next →</button>
         <button className="btn btn-ghost btn-sm" onClick={() => setWeekOffset(0)}>This Week</button>
-        <button className="btn btn-secondary btn-sm" onClick={() => { setRotationError(""); setRotationOpen(true); }} title="Repeat this week + next week as a 2-week pattern across future weeks">🔁 Repeat 2-Week Pattern…</button>
+        <button className="btn btn-secondary btn-sm" onClick={() => { setRotationError(""); setRotationOpen(true); }}>🔁 Repeat 2-Week Pattern…</button>
       </div>
       <div className="cal-header">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => <div key={d} className="cal-day-label">{d}</div>)}</div>
       <div className="cal-grid">
@@ -600,8 +555,6 @@ function SAMenuEditor() {
           </div>
         </div>
       )}
-
-      {/* REPEAT-PATTERN MODAL */}
       {rotationOpen && (
         <div className="modal-overlay" onClick={() => !rotationBusy && setRotationOpen(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -619,15 +572,12 @@ function SAMenuEditor() {
             <div className="form-group">
               <label className="form-label">Apply this pattern for the next:</label>
               <div className="flex-gap">
-                <input className="form-input" type="number" min="1" max="52"
-                  value={rotationWeeks}
-                  onChange={e => setRotationWeeks(e.target.value)}
-                  style={{ width: 90 }} />
+                <input className="form-input" type="number" min="1" max="52" value={rotationWeeks} onChange={e => setRotationWeeks(e.target.value)} style={{ width: 90 }} />
                 <span style={{ fontWeight: 600 }}>weeks</span>
               </div>
             </div>
             <div style={{ background: "#FFF8E1", padding: "10px 14px", borderRadius: 8, fontSize: 12, color: "#7A6000", marginBottom: 16, lineHeight: 1.5 }}>
-              ⚠️ This will <b>overwrite</b> any existing menu on those weekdays. Weekends and all-locations blocked days are skipped automatically. Parents are <b>not</b> emailed for these bulk updates — edit individual days afterward if you want to send a notification.
+              ⚠️ This will <b>overwrite</b> any existing menu on those weekdays. Weekends and all-locations blocked days are skipped automatically. Parents are <b>not</b> emailed for these bulk updates.
             </div>
             <div className="flex-gap">
               <button className="btn btn-primary" onClick={applyRotation} disabled={rotationBusy}>{rotationBusy ? "Applying…" : "Apply Pattern"}</button>
@@ -639,6 +589,7 @@ function SAMenuEditor() {
     </div>
   );
 }
+
 
 function SAOrders() {
   const { orders, locations, actions } = useApp();
@@ -788,7 +739,6 @@ function ReportTabs({ tab, setTab }) {
   );
 }
 
-// Shared report renderer used by both Super Admin (all locations) and School Admin (one location).
 function ReportPanel({ orders, parents, locations, scopedToLocation = null }) {
   const [tab, setTab] = useState("daily");
   const [filterLoc, setFilterLoc] = useState(scopedToLocation || "All");
@@ -954,11 +904,8 @@ function SAHolidays() {
       }
       setLabel(""); setStartDate(""); setEndDate("");
       setTimeout(() => setSaved(false), 2500);
-    } catch (err) {
-      setError(err.message || "Failed to block day(s).");
-    } finally {
-      setBusy(false);
-    }
+    } catch (err) { setError(err.message || "Failed to block day(s)."); }
+    finally { setBusy(false); }
   };
 
   const removeGroup = async (group) => {
@@ -995,13 +942,10 @@ function SAHolidays() {
           </div>
           <button className="btn btn-primary" onClick={addDays} style={{ marginBottom: 0 }} disabled={busy}>{busy ? "Saving…" : (endDate && endDate !== startDate ? "Block Range" : "Block Day")}</button>
         </div>
-        <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>
-          Tip: leave End Date empty for a single day. Including weekends in a range is fine — they're already non-orderable, but the label keeps the calendar consistent.
-        </div>
       </div>
       <div className="card">
         <div className="card-title">Blocked ({groups.length} {groups.length === 1 ? "entry" : "entries"})</div>
-        {groups.length === 0 ? <div className="empty-state"><div className="empty-icon">📅</div><div className="empty-text">No blocked days</div><div className="empty-sub">Add holidays or no-school days above.</div></div> : (
+        {groups.length === 0 ? <div className="empty-state"><div className="empty-icon">📅</div><div className="empty-text">No blocked days</div></div> : (
           <div className="table-wrap"><table>
             <thead><tr><th>Date(s)</th><th>Label</th><th>Applies To</th><th></th></tr></thead>
             <tbody>{groups.map((g, i) => (
@@ -1040,13 +984,9 @@ function SALocations() {
     if (!trimmed) return setError("Please enter a location name.");
     if (locations.includes(trimmed)) return setError("That location already exists.");
     setBusy(true);
-    try {
-      await actions.addLocation(trimmed);
-      setNewName("");
-      flash("✓ Location added!");
-    } catch (err) {
-      setError(err.message || "Failed to add.");
-    } finally { setBusy(false); }
+    try { await actions.addLocation(trimmed); setNewName(""); flash("✓ Location added!"); }
+    catch (err) { setError(err.message || "Failed to add."); }
+    finally { setBusy(false); }
   };
 
   const startEdit = (name) => { setEditId(name); setEditName(name); setError(""); };
@@ -1057,13 +997,9 @@ function SALocations() {
     if (!trimmed) return;
     if (locations.includes(trimmed) && trimmed !== editId) return setError("That name is already taken.");
     setBusy(true);
-    try {
-      await actions.renameLocation(editId, trimmed);
-      setEditId(null);
-      flash("✓ Location renamed!");
-    } catch (err) {
-      setError(err.message || "Failed to rename.");
-    } finally { setBusy(false); }
+    try { await actions.renameLocation(editId, trimmed); setEditId(null); flash("✓ Location renamed!"); }
+    catch (err) { setError(err.message || "Failed to rename."); }
+    finally { setBusy(false); }
   };
 
   const removeLocation = async (name) => {
@@ -1072,12 +1008,9 @@ function SALocations() {
     if (inUse) return setError(`Cannot delete "${name}" — it has parents or orders assigned to it.`);
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
     setBusy(true);
-    try {
-      await actions.deleteLocation(name);
-      flash("✓ Location deleted.");
-    } catch (err) {
-      setError(err.message || "Failed to delete.");
-    } finally { setBusy(false); }
+    try { await actions.deleteLocation(name); flash("✓ Location deleted."); }
+    catch (err) { setError(err.message || "Failed to delete."); }
+    finally { setBusy(false); }
   };
 
   return (
@@ -1086,7 +1019,6 @@ function SALocations() {
       <div className="page-subtitle">Add, rename, or remove service locations.</div>
       {saved && <div className="success-banner">{saved}</div>}
       {error && <div style={{ background: "#FDEEF3", border: "1px solid #F5B8C9", borderRadius: "var(--radius-sm)", padding: "10px 14px", fontSize: 13, color: "var(--danger)", marginBottom: 16 }}>{error}</div>}
-
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-title">Add New Location</div>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
@@ -1098,7 +1030,6 @@ function SALocations() {
           <button className="btn btn-primary" onClick={addLocation} disabled={busy}>{busy ? "…" : "Add Location"}</button>
         </div>
       </div>
-
       <div className="card">
         <div className="card-title">All Locations ({locations.length})</div>
         {locations.length === 0
@@ -1153,17 +1084,11 @@ function SADrinks() {
     const trimmed = newName.trim();
     setError("");
     if (!trimmed) return setError("Please enter a drink name.");
-    if (drinks.some(d => d.name.toLowerCase() === trimmed.toLowerCase())) {
-      return setError("That drink already exists.");
-    }
+    if (drinks.some(d => d.name.toLowerCase() === trimmed.toLowerCase())) return setError("That drink already exists.");
     setBusy(true);
-    try {
-      await actions.addDrink({ name: trimmed, emoji: newEmoji.trim() });
-      setNewName(""); setNewEmoji("");
-      flash("✓ Drink added!");
-    } catch (err) {
-      setError(err.message || "Failed to add.");
-    } finally { setBusy(false); }
+    try { await actions.addDrink({ name: trimmed, emoji: newEmoji.trim() }); setNewName(""); setNewEmoji(""); flash("✓ Drink added!"); }
+    catch (err) { setError(err.message || "Failed to add."); }
+    finally { setBusy(false); }
   };
 
   const startEdit = (d) => { setEditId(d.id); setEditName(d.name); setEditEmoji(d.emoji || ""); setError(""); };
@@ -1172,28 +1097,19 @@ function SADrinks() {
     const trimmedName = editName.trim();
     setError("");
     if (!trimmedName) return setError("Name cannot be empty.");
-    if (drinks.some(d => d.id !== editId && d.name.toLowerCase() === trimmedName.toLowerCase())) {
-      return setError("That name is already taken.");
-    }
+    if (drinks.some(d => d.id !== editId && d.name.toLowerCase() === trimmedName.toLowerCase())) return setError("That name is already taken.");
     setBusy(true);
-    try {
-      await actions.updateDrink(editId, { name: trimmedName, emoji: editEmoji.trim() });
-      setEditId(null);
-      flash("✓ Drink updated!");
-    } catch (err) {
-      setError(err.message || "Failed to update.");
-    } finally { setBusy(false); }
+    try { await actions.updateDrink(editId, { name: trimmedName, emoji: editEmoji.trim() }); setEditId(null); flash("✓ Drink updated!"); }
+    catch (err) { setError(err.message || "Failed to update."); }
+    finally { setBusy(false); }
   };
 
   const removeDrink = async (d) => {
     if (!confirm(`Delete "${d.name}"? Existing orders that already chose this drink will keep the name.`)) return;
     setBusy(true);
-    try {
-      await actions.deleteDrink(d.id);
-      flash("✓ Drink deleted.");
-    } catch (err) {
-      setError(err.message || "Failed to delete.");
-    } finally { setBusy(false); }
+    try { await actions.deleteDrink(d.id); flash("✓ Drink deleted."); }
+    catch (err) { setError(err.message || "Failed to delete."); }
+    finally { setBusy(false); }
   };
 
   return (
@@ -1202,7 +1118,6 @@ function SADrinks() {
       <div className="page-subtitle">Manage the drink choices parents see when placing an order. Existing orders keep whatever drink was chosen, even if the option is later removed.</div>
       {saved && <div className="success-banner">{saved}</div>}
       {error && <div style={{ background: "#FDEEF3", border: "1px solid #F5B8C9", borderRadius: "var(--radius-sm)", padding: "10px 14px", fontSize: 13, color: "var(--danger)", marginBottom: 16 }}>{error}</div>}
-
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-title">Add New Drink</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 110px auto", gap: 12, alignItems: "end" }}>
@@ -1218,15 +1133,11 @@ function SADrinks() {
           </div>
           <button className="btn btn-primary" onClick={addDrink} disabled={busy}>{busy ? "…" : "Add Drink"}</button>
         </div>
-        <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 8 }}>
-          Tip: open your emoji keyboard with Win+. (Windows) or Ctrl+Cmd+Space (Mac).
-        </div>
       </div>
-
       <div className="card">
         <div className="card-title">All Drinks ({drinks.length})</div>
         {drinks.length === 0
-          ? <div className="empty-state"><div className="empty-icon">🥤</div><div className="empty-text">No drinks configured</div><div className="empty-sub">Parents won't be able to place orders until at least one drink is added.</div></div>
+          ? <div className="empty-state"><div className="empty-icon">🥤</div><div className="empty-text">No drinks configured</div></div>
           : drinks.map(d => (
             <div key={d.id} style={{ padding: "14px 0", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               {editId === d.id ? (
@@ -1273,9 +1184,6 @@ function SANotifications() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SCHOOL ADMIN
-// ═══════════════════════════════════════════════════════════════════════════════
 function SchoolAdminPages({ page }) {
   const map = {
     dashboard: <SchoolToday />,
@@ -1352,21 +1260,11 @@ function SchoolWeekly() {
 
 function SchoolStudents() {
   const { profile, orders } = useApp();
-  // For school admins we don't have full parent list; derive students from their orders.
   const seen = new Map();
   for (const o of orders.filter(x => x.location === profile.location)) {
     if (!seen.has(o.childId)) {
-      seen.set(o.childId, {
-        id: o.childId,
-        name: o.childName,
-        grade: o.childGrade,
-        parentName: o.parentName,
-        dietary: o.dietary,
-        orderCount: 1,
-      });
-    } else {
-      seen.get(o.childId).orderCount++;
-    }
+      seen.set(o.childId, { id: o.childId, name: o.childName, grade: o.childGrade, parentName: o.parentName, dietary: o.dietary, orderCount: 1 });
+    } else { seen.get(o.childId).orderCount++; }
   }
   const students = [...seen.values()].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   return (
@@ -1378,11 +1276,9 @@ function SchoolStudents() {
             <thead><tr><th>Student</th><th>Grade</th><th>Dietary</th><th>Parent</th><th>Orders</th></tr></thead>
             <tbody>{students.map(c => (
               <tr key={c.id}>
-                <td style={{ fontWeight: 600 }}>{c.name}</td>
-                <td>{c.grade}</td>
+                <td style={{ fontWeight: 600 }}>{c.name}</td><td>{c.grade}</td>
                 <td>{hasDietary(c.dietary) ? <span className="tag tag-gold" style={{ maxWidth: 180, whiteSpace: "normal" }}>{formatDietary(c.dietary)}</span> : "—"}</td>
-                <td>{c.parentName}</td>
-                <td>{c.orderCount}</td>
+                <td>{c.parentName}</td><td>{c.orderCount}</td>
               </tr>
             ))}</tbody>
           </table></div>
@@ -1396,6 +1292,7 @@ function SchoolReports() {
   const { profile, orders } = useApp();
   return <ReportPanel orders={orders} parents={[]} locations={[profile.location]} scopedToLocation={profile.location} />;
 }
+
 
 function SchoolHolidays() {
   const { profile, blockedDays, actions } = useApp();
@@ -1436,10 +1333,8 @@ function SchoolHolidays() {
     } catch (err) { alert(err.message || "Failed to remove."); }
   };
 
-  // Show only days that affect this school's parents (their location or 'all')
   const relevantBlocked = Object.fromEntries(
-    Object.entries(blockedDays || {})
-      .filter(([_, info]) => info.locations === "all" || info.locations === profile.location)
+    Object.entries(blockedDays || {}).filter(([_, info]) => info.locations === "all" || info.locations === profile.location)
   );
   const groups = groupBlockedDays(relevantBlocked);
 
@@ -1484,12 +1379,8 @@ function SchoolHolidays() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PARENT
-// ═══════════════════════════════════════════════════════════════════════════════
 function ParentPages({ page }) {
   const { children } = useApp();
-  // Hide order calendar if no children — graceful fallback to children page
   const map = {
     dashboard: <ParentDashboard />,
     order: children.length === 0 ? <NoChildrenCard /> : <ParentOrderCalendar />,
@@ -1576,7 +1467,6 @@ function ParentOrderCalendar() {
   const weekDates = getWeekDates(weekOffset);
   const today = todayStr();
 
-  // If children list refreshed (a child was added/removed), reconcile selection.
   useEffect(() => {
     if (children.length === 0) return;
     if (!selectedChild || !children.find(c => c.id === selectedChild)) {
@@ -1592,10 +1482,7 @@ function ParentOrderCalendar() {
     if (isBlocked(ds, blockedDays, profile.location)) return;
     const existing = getOrder(ds, selectedChild);
     const child = children.find(c => c.id === selectedChild);
-    if (existing) {
-      setEditModal({ ds, child, existing });
-      return;
-    }
+    if (existing) { setEditModal({ ds, child, existing }); return; }
     const m = menu[ds];
     if (!m?.items?.length) return;
     setPickModal({ ds, child, items: m.items, menuDayId: m.id });
@@ -1609,20 +1496,458 @@ function ParentOrderCalendar() {
       setEditModal(null);
       const m = menu[ds];
       setPickModal({ ds, child, items: m.items, menuDayId: m.id });
-    } catch (err) {
-      setError(err.message || "Failed to edit.");
-      setEditModal(null);
-    } finally { setBusy(false); }
+    } catch (err) { setError(err.message || "Failed to edit."); setEditModal(null); }
+    finally { setBusy(false); }
   };
 
   const handleDeleteOrder = async () => {
     setBusy(true);
-    try {
-      await actions.cancelOrder(editModal.existing.id);
-      setEditModal(null);
-    } catch (err) {
-      alert(err.message || "Failed to cancel.");
-    } finally { setBusy(false); }
+    try { await actions.cancelOrder(editModal.existing.id); setEditModal(null); }
+    catch (err) { alert(err.message || "Failed to cancel."); }
+    finally { setBusy(false); }
   };
 
- 
+  const confirmItem = (item, itemIndex) => {
+    const { ds, child, menuDayId } = pickModal;
+    setPickModal(null);
+    setDrinkModal({ ds, child, item, itemIndex, menuDayId });
+  };
+
+  const confirmDrink = async (drink) => {
+    const { ds, child, item, itemIndex, menuDayId } = drinkModal;
+    setBusy(true); setError("");
+    try {
+      await actions.placeOrder({
+        parentId: profile.id, childId: child.id, menuDayId, menuItemId: item.id,
+        itemName: item.name, itemPrice: item.price, drink, location: profile.location, orderDate: ds,
+      });
+      setDrinkModal(null);
+      const weekdayNum = new Date(ds + "T12:00:00").getDay();
+      const weekdayName = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][weekdayNum];
+      const isoWeekday = weekdayNum === 0 ? 7 : weekdayNum;
+      const existingRepeat = repeatOrders.find(r => r.child_id === child.id && r.weekday === isoWeekday);
+      setRepeatModal({ ds, child, weekday: isoWeekday, weekdayName, item, itemIndex, drink, alreadyRepeating: !!existingRepeat });
+    } catch (err) { setError(err.message || "Failed to place order."); setDrinkModal(null); }
+    finally { setBusy(false); }
+  };
+
+  const saveRepeat = async () => {
+    const { child, weekday, itemIndex, drink } = repeatModal;
+    try {
+      await actions.upsertRepeatOrder({
+        parentId: profile.id, childId: child.id, weekday, itemIndex, drink, location: profile.location,
+      });
+    } catch (err) { alert(err.message || "Failed to set up repeat."); }
+    setRepeatModal(null);
+  };
+
+  return (
+    <div>
+      <div className="page-title">📅 Order Lunches</div>
+      <div className="page-subtitle">Tap a day to choose a meal. Tap an ordered day to edit or cancel.</div>
+      {error && <div style={{ background: "#FDEEF3", border: "1px solid #F5B8C9", borderRadius: "var(--radius-sm)", padding: "10px 14px", fontSize: 13, color: "var(--danger)", marginBottom: 16 }}>⚠️ {error}</div>}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <label className="form-label">Ordering for</label>
+        <select className="form-input form-select" style={{ maxWidth: 240 }} value={selectedChild} onChange={e => setSelectedChild(e.target.value)}>
+          {children.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+      <div className="cutoff-notice">⏰ Daily cutoff is 8:00 AM. Orders and cancellations are locked after that.</div>
+      <div className="week-nav">
+        <button className="btn btn-ghost btn-sm" onClick={() => setWeekOffset(w => w - 1)}>← Prev Week</button>
+        <span style={{ fontWeight: 700, fontSize: 14 }}>{formatDate(weekDates[0])} – {formatDate(weekDates[6])}</span>
+        <button className="btn btn-ghost btn-sm" onClick={() => setWeekOffset(w => w + 1)}>Next Week →</button>
+        <button className="btn btn-ghost btn-sm" onClick={() => setWeekOffset(0)}>This Week</button>
+      </div>
+      <div className="cal-header">{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => <div key={d} className="cal-day-label">{d}</div>)}</div>
+      <div className="cal-grid">
+        {weekDates.map(ds => {
+          const isWknd = [0, 6].includes(new Date(ds + "T12:00:00").getDay());
+          const m = menu[ds];
+          const ordered = selectedChild && getOrder(ds, selectedChild);
+          const pastCutoff = isPastCutoff(ds);
+          const blocked = isBlocked(ds, blockedDays, profile.location);
+          const blockInfo = blockedDays?.[ds];
+          const canClick = !isWknd && !blocked && m?.items?.length > 0 && (!pastCutoff || ordered);
+          return (
+            <div key={ds} className={`cal-cell${ds === today ? " today" : ""}${isWknd ? " weekend" : ""}${blocked ? " weekend" : ""}${ordered && !blocked ? " has-order" : ""}${(pastCutoff && !ordered) || blocked ? " past" : ""}${canClick ? " clickable" : ""}`}
+              onClick={() => canClick && handleCellClick(ds)}>
+              <div className="cal-date">{new Date(ds + "T12:00:00").getDate()}</div>
+              {isWknd ? <div style={{ fontSize: 11, color: "var(--text3)" }}>Weekend</div>
+                : blocked ? <div style={{ fontSize: 10, color: "var(--danger)", fontWeight: 700 }}>🚫 {blockInfo?.label || "No School"}</div>
+                : !m?.items?.length ? <div style={{ fontSize: 11, color: "var(--text3)" }}>No menu</div>
+                : <>
+                  <div className="cal-items">{m.items.map((it, i) => <div key={i}>• {it.name}</div>)}</div>
+                  {ordered ? <div className="cal-ordered">✓ {ordered.mainItem}</div>
+                    : pastCutoff ? <div style={{ fontSize: 10, color: "var(--danger)", fontWeight: 600 }}>Cutoff passed</div>
+                    : <div style={{ fontSize: 10, color: "var(--secondary)", fontWeight: 600 }}>Tap to order</div>}
+                </>}
+            </div>
+          );
+        })}
+      </div>
+
+      {editModal && (
+        <div className="modal-overlay" onClick={() => !busy && setEditModal(null)}>
+          <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Manage Order <button className="modal-close" onClick={() => !busy && setEditModal(null)}>×</button></div>
+            <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 4 }}>{formatDate(editModal.ds)} — {editModal.child?.name}</div>
+            <div style={{ background: "var(--bg2)", borderRadius: "var(--radius-sm)", padding: "12px 16px", marginBottom: 20 }}>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>{editModal.existing.mainItem}</div>
+              <div style={{ fontSize: 13, color: "var(--secondary)", fontWeight: 600, marginTop: 4 }}>🥤 {editModal.existing.drink}</div>
+            </div>
+            <p style={{ fontSize: 13, color: "var(--text2)", marginBottom: 20 }}>Would you like to edit or delete this order?</p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button className="btn btn-primary" style={{ flex: 1, justifyContent: "center" }} onClick={handleEditOrder} disabled={busy}>✏️ Edit Order</button>
+              <button className="btn btn-danger" style={{ flex: 1, justifyContent: "center" }} onClick={handleDeleteOrder} disabled={busy}>🗑️ Delete Order</button>
+            </div>
+            <button className="btn btn-ghost" style={{ width: "100%", justifyContent: "center", marginTop: 10 }} onClick={() => setEditModal(null)} disabled={busy}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {pickModal && (
+        <div className="modal-overlay" onClick={() => setPickModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Step 1 of 2 — Choose a Meal <button className="modal-close" onClick={() => setPickModal(null)}>×</button></div>
+            <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 16 }}>{formatDate(pickModal.ds)} — {pickModal.child?.name}</div>
+            {pickModal.items.map((item, i) => (
+              <div key={i} className="item-pick" onClick={() => confirmItem(item, i + 1)}>
+                <div className="item-pick-radio"><div className="item-pick-inner" /></div>
+                <div className="item-pick-name"><span style={{ color: "var(--text3)", fontWeight: 700, marginRight: 8 }}>#{i + 1}</span>{item.name}</div>
+              </div>
+            ))}
+            <button className="btn btn-ghost" style={{ width: "100%", justifyContent: "center", marginTop: 4 }} onClick={() => setPickModal(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {drinkModal && (
+        <div className="modal-overlay" onClick={() => !busy && setDrinkModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Step 2 of 2 — Choose a Drink <button className="modal-close" onClick={() => !busy && setDrinkModal(null)}>×</button></div>
+            <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 4 }}>{formatDate(drinkModal.ds)} — {drinkModal.child?.name}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>🍽️ {drinkModal.item?.name}</div>
+            {drinks.length === 0 ? (
+              <div style={{ fontSize: 13, color: "var(--text3)", padding: "12px 0" }}>
+                No drink options available — please ask the school admin to add some.
+              </div>
+            ) : (
+              drinks.map((d) => (
+                <div key={d.id} className="item-pick" onClick={() => !busy && confirmDrink(d.name)}>
+                  <div style={{ fontSize: 28, width: 36, textAlign: "center" }}>{d.emoji || "🥤"}</div>
+                  <div className="item-pick-name">{d.name}</div>
+                </div>
+              ))
+            )}
+            <button className="btn btn-ghost" style={{ width: "100%", justifyContent: "center", marginTop: 4 }} onClick={() => setDrinkModal(null)} disabled={busy}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {repeatModal && (
+        <RepeatModal info={repeatModal} onSave={saveRepeat} onClose={() => setRepeatModal(null)} />
+      )}
+    </div>
+  );
+}
+
+function RepeatModal({ info, onSave, onClose }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+        <div style={{ textAlign: "center", paddingBottom: 16 }}>
+          <div style={{ fontSize: 44, marginBottom: 8 }}>✅</div>
+          <div style={{ fontFamily: "'Nunito',sans-serif", fontWeight: 900, fontSize: 22 }}>Order Placed!</div>
+          <div style={{ fontSize: 13, color: "var(--text2)", marginTop: 6, lineHeight: 1.5 }}>
+            <b>{info.child.name}</b> will have <b>{info.item.name}</b> with <b>{info.drink}</b> on {formatDate(info.ds)}.
+          </div>
+        </div>
+        <div className="repeat-section">
+          <div className="repeat-title">🔁 Repeat this order every {info.weekdayName}?</div>
+          <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 8, lineHeight: 1.5 }}>
+            We'll auto-order <b>menu option #{info.itemIndex}</b> with <b>{info.drink}</b> for <b>{info.child.name}</b> every {info.weekdayName}, 3 weeks in advance, until you turn it off.
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text3)", lineHeight: 1.5, padding: "8px 12px", background: "var(--bg2)", borderRadius: 8 }}>
+            <b>Important:</b> the menu rotates between weeks, so the actual food may differ. We'll always pick the <b>{info.itemIndex === 1 ? "first" : info.itemIndex === 2 ? "second" : info.itemIndex === 3 ? "third" : `#${info.itemIndex}`}</b> item from each {info.weekdayName}'s menu. Today that's <b>{info.item.name}</b>.
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 8 }}>
+            Blocked days and days where the menu has fewer items are skipped automatically. Manage repeats anytime in <b>My Profile</b>.
+          </div>
+          {info.alreadyRepeating && (
+            <div style={{ fontSize: 12, color: "#7A6000", marginTop: 8, fontWeight: 600 }}>
+              ⚠️ You already have a repeat for {info.child.name} on {info.weekdayName}s — saving will replace it with this new pick.
+            </div>
+          )}
+        </div>
+        <div className="flex-gap" style={{ marginTop: 16, justifyContent: "flex-end" }}>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>No, just this once</button>
+          <button className="btn btn-primary" onClick={onSave}>Yes, repeat every {info.weekdayName}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ParentMyOrders() {
+  const { children, orders, actions } = useApp();
+  const sorted = useMemo(() => orders.slice().sort((a, b) => a.date.localeCompare(b.date)), [orders]);
+  const cancel = async (o) => {
+    if (isPastCutoff(o.date)) return alert("Cannot cancel — the 8AM cutoff has passed.");
+    if (!confirm("Cancel this order?")) return;
+    try { await actions.cancelOrder(o.id); }
+    catch (err) { alert(err.message || "Failed to cancel."); }
+  };
+  return (
+    <div>
+      <div className="page-title">📋 My Orders</div>
+      <div className="page-subtitle">View and cancel upcoming orders before the 8AM cutoff.</div>
+      <div className="card">
+        {sorted.length === 0 ? <div className="empty-state"><div className="empty-icon">📭</div><div className="empty-text">No orders yet</div></div> : (
+          <div className="table-wrap"><table>
+            <thead><tr><th>Date</th><th>Child</th><th>Food</th><th>Drink</th><th>Status</th><th></th></tr></thead>
+            <tbody>{sorted.map(o => {
+              const child = children.find(c => c.id === o.childId);
+              const past = isPastCutoff(o.date); const future = o.date > todayStr();
+              return <tr key={o.id}>
+                <td>{formatDate(o.date)}</td><td style={{ fontWeight: 600 }}>{child?.name || o.childName}</td>
+                <td>{o.mainItem}</td><td>{o.drink}</td>
+                <td>{past ? <span className="tag tag-gray">Past</span> : future ? <span className="tag tag-green">Upcoming</span> : <span className="tag tag-teal">Today</span>}</td>
+                <td>{!past && <button className="btn btn-danger btn-xs" onClick={() => cancel(o)}>Cancel</button>}</td>
+              </tr>;
+            })}</tbody>
+          </table></div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ParentProfile() {
+  const { profile, children, locations, repeatOrders, actions } = useApp();
+  const [form, setForm] = useState({ name: profile.name, phone: profile.phone || "", location: profile.location || "" });
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setError("");
+    if (!form.name?.trim()) return setError("Name cannot be empty.");
+    if (!form.phone?.trim()) return setError("A contact phone number is required.");
+    setBusy(true);
+    try {
+      await actions.updateProfile(profile.id, form);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) { setError(err.message || "Failed to save profile."); }
+    finally { setBusy(false); }
+  };
+  const turnOffRepeat = async (r) => {
+    const childName = r.children?.name || children.find(c => c.id === r.child_id)?.name || "this child";
+    const WEEKDAY_FULL = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    if (!confirm(`Turn off the ${WEEKDAY_FULL[r.weekday]} repeat for ${childName}? Future auto-orders will be canceled.`)) return;
+    try { await actions.deleteRepeatOrder(r.id); }
+    catch (err) { alert(err.message || "Failed to turn off repeat."); }
+  };
+  return (
+    <div>
+      <div className="page-title">👤 My Profile</div>
+      <div className="page-subtitle">Update your account details.</div>
+      {saved && <div className="success-banner">✓ Profile saved!</div>}
+      {error && <div className="login-error">⚠️ {error}</div>}
+      <div className="card" style={{ maxWidth: 560 }}>
+        <div className="form-row">
+          <div className="form-group"><label className="form-label">Full Name *</label><input className="form-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+          <div className="form-group"><label className="form-label">Phone *</label><input className="form-input" type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="555-123-4567" /></div>
+        </div>
+        <div className="form-group"><label className="form-label">Email</label><input className="form-input" type="email" value={profile.email || ""} disabled /></div>
+        <div className="form-group">
+          <label className="form-label">Location</label>
+          <select className="form-input form-select" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))}>
+            {locations.map(l => <option key={l}>{l}</option>)}
+          </select>
+        </div>
+        <button className="btn btn-primary" onClick={save} disabled={busy}>{busy ? "Saving…" : "Save Changes"}</button>
+      </div>
+
+      <div className="card" style={{ maxWidth: 720, marginTop: 24 }}>
+        <div className="card-title">🔁 Active Repeat Orders</div>
+        <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 16 }}>
+          Each repeat auto-creates an order every week, three weeks in advance, until you turn it off. Blocked days and weeks where the menu isn't set yet are skipped.
+        </div>
+        {repeatOrders.length === 0 ? (
+          <div className="empty-state" style={{ padding: "24px" }}>
+            <div className="empty-icon" style={{ fontSize: 32 }}>🔁</div>
+            <div className="empty-text">No active repeats</div>
+            <div className="empty-sub">Place an order from the Order Lunches calendar; you'll be asked if you want to repeat it weekly.</div>
+          </div>
+        ) : (
+          <div className="table-wrap"><table>
+            <thead><tr><th>Child</th><th>Day</th><th>Menu Pick</th><th>Drink</th><th></th></tr></thead>
+            <tbody>{repeatOrders.map(r => {
+              const WEEKDAY_FULL = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+              const childName = r.children?.name || children.find(c => c.id === r.child_id)?.name || "—";
+              return (
+                <tr key={r.id}>
+                  <td style={{ fontWeight: 600 }}>{childName}</td>
+                  <td>Every {WEEKDAY_FULL[r.weekday]}</td>
+                  <td>Menu option <b>#{r.item_index}</b></td>
+                  <td>{r.drink}</td>
+                  <td><button className="btn btn-danger btn-xs" onClick={() => turnOffRepeat(r)}>Turn Off</button></td>
+                </tr>
+              );
+            })}</tbody>
+          </table></div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ParentChildren() {
+  const { children, actions } = useApp();
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ name: "", grade: GRADES[0], dietary: { selected: [], otherDetails: "" } });
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const add = async () => {
+    if (!form.name.trim()) return setError("Please enter a name.");
+    setBusy(true); setError("");
+    try {
+      await actions.upsertChild(form);
+      setForm({ name: "", grade: GRADES[0], dietary: { selected: [], otherDetails: "" } });
+      setShowAdd(false);
+    } catch (err) { setError(err.message || "Failed to add child."); }
+    finally { setBusy(false); }
+  };
+  const remove = async (id) => {
+    if (!confirm("Remove this child?")) return;
+    try { await actions.deleteChild(id); }
+    catch (err) { alert(err.message || "Failed to remove."); }
+  };
+  const updateField = async (child, key, val) => {
+    try { await actions.upsertChild({ ...child, [key]: val }); }
+    catch (err) { alert(err.message || "Failed to save."); }
+  };
+
+  return (
+    <div>
+      <div className="page-title">🎒 My Children</div>
+      <div className="page-subtitle">Manage your children's profiles and dietary needs.</div>
+      {children.map(c => (
+        <ChildEditor key={c.id} child={c} onUpdate={(k, v) => updateField(c, k, v)} onRemove={() => remove(c.id)} />
+      ))}
+      {showAdd ? (
+        <div className="card" style={{ border: "2px dashed var(--secondary)" }}>
+          <div className="card-title">➕ Add Child</div>
+          {error && <div className="login-error">⚠️ {error}</div>}
+          <div className="form-row">
+            <div className="form-group"><label className="form-label">Name</label><input className="form-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Child's full name" /></div>
+            <div className="form-group"><label className="form-label">Grade</label><select className="form-input form-select" value={form.grade} onChange={e => setForm(f => ({ ...f, grade: e.target.value }))}>{GRADES.map(g => <option key={g}>{g}</option>)}</select></div>
+          </div>
+          <DietaryPicker value={form.dietary} onChange={val => setForm(f => ({ ...f, dietary: val }))} />
+          <div className="flex-gap">
+            <button className="btn btn-secondary" onClick={add} disabled={busy}>{busy ? "Adding…" : "Add Child"}</button>
+            <button className="btn btn-ghost" onClick={() => setShowAdd(false)}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <button className="btn btn-secondary" onClick={() => setShowAdd(true)}>➕ Add a Child</button>
+      )}
+    </div>
+  );
+}
+
+function ChildEditor({ child, onUpdate, onRemove }) {
+  const [name, setName] = useState(child.name);
+  const commitName = () => {
+    const trimmed = name.trim();
+    if (trimmed && trimmed !== child.name) onUpdate("name", trimmed);
+    else if (!trimmed) setName(child.name);
+  };
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <div className="flex-between" style={{ marginBottom: 12 }}>
+        <div style={{ fontFamily: "'Nunito',sans-serif", fontWeight: 800, fontSize: 18 }}>👦 {child.name}</div>
+        <button className="btn btn-danger btn-xs" onClick={onRemove}>Remove</button>
+      </div>
+      <div className="form-row">
+        <div className="form-group">
+          <label className="form-label">Name</label>
+          <input className="form-input" value={name} onChange={e => setName(e.target.value)} onBlur={commitName} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Grade</label>
+          <select className="form-input form-select" value={child.grade} onChange={e => onUpdate("grade", e.target.value)}>
+            {GRADES.map(g => <option key={g}>{g}</option>)}
+          </select>
+        </div>
+      </div>
+      <DietaryPicker value={child.dietary} onChange={val => onUpdate("dietary", val)} />
+      {hasDietary(child.dietary) && <div className="cutoff-notice">⚠️ Dietary restrictions: <b>{formatDietary(child.dietary)}</b> — visible to school admin on order sheets.</div>}
+    </div>
+  );
+}
+
+function DietaryPicker({ value, onChange }) {
+  const norm = (v) => {
+    if (!v || (typeof v === "string" && v === "None")) return { selected: [], otherDetails: "" };
+    if (typeof v === "string") return { selected: [v], otherDetails: "" };
+    return v;
+  };
+  const val = norm(value);
+  const toggle = (opt) => {
+    const already = val.selected.includes(opt);
+    onChange({ ...val, selected: already ? val.selected.filter(x => x !== opt) : [...val.selected, opt] });
+  };
+  const setOther = (text) => onChange({ ...val, otherDetails: text });
+  const showOther = val.selected.includes("Other");
+  const toggleOther = () => {
+    if (showOther) onChange({ ...val, selected: val.selected.filter(x => x !== "Other"), otherDetails: "" });
+    else onChange({ ...val, selected: [...val.selected, "Other"] });
+  };
+  return (
+    <div className="form-group">
+      <label className="form-label">Dietary Restrictions <span style={{ fontSize: 10, fontWeight: 400, textTransform: "none", letterSpacing: 0, color: "var(--text3)" }}>— select all that apply</span></label>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: showOther ? 10 : 0 }}>
+        {DIETARY_OPTIONS.map(opt => {
+          const active = val.selected.includes(opt);
+          return (
+            <button key={opt} type="button" onClick={() => toggle(opt)}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "6px 14px", borderRadius: 20, fontSize: 13, fontWeight: 600,
+                cursor: "pointer", border: "1.5px solid", transition: "all 0.15s",
+                background: active ? "var(--primary)" : "var(--surface)",
+                color: active ? "white" : "var(--text2)",
+                borderColor: active ? "var(--primary)" : "var(--border)",
+              }}>
+              {active && <span style={{ fontSize: 11 }}>✓</span>}
+              {opt}
+            </button>
+          );
+        })}
+        <button type="button" onClick={toggleOther}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "6px 14px", borderRadius: 20, fontSize: 13, fontWeight: 600,
+            cursor: "pointer", border: "1.5px solid", transition: "all 0.15s",
+            background: showOther ? "var(--secondary)" : "var(--surface)",
+            color: showOther ? "white" : "var(--text2)",
+            borderColor: showOther ? "var(--secondary)" : "var(--border)",
+          }}>
+          {showOther && <span style={{ fontSize: 11 }}>✓</span>}
+          Other / Not Listed
+        </button>
+      </div>
+      {showOther && (
+        <div style={{ marginTop: 8 }}>
+          <input className="form-input" placeholder="Please describe the restriction(s)…" value={val.otherDetails || ""} onChange={e => setOther(e.target.value)} />
+        </div>
+      )}
+      {(val.selected.length === 0) && (
+        <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 6 }}>No restrictions selected — child has no dietary restrictions.</div>
+      )}
+    </div>
+  );
+}
