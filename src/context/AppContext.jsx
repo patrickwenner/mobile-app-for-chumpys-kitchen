@@ -44,6 +44,7 @@ import {
   deleteChild as sbDeleteChild,
   updateProfile as sbUpdateProfile,
   deleteParent as sbDeleteParent,
+  sendPasswordReset as sbSendPasswordReset,
 } from "../lib/supabase";
 
 // ── Normalizers (snake_case DB rows → camelCase UI shape) ──────
@@ -351,6 +352,9 @@ export function AppProvider({ children }) {
     deleteParent: async (id) => {
       await sbDeleteParent(id);
       await refreshParents();
+    },
+    sendPasswordReset: async (email) => {
+      await sbSendPasswordReset(email);
     },
   };
 
