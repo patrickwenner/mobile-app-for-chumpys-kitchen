@@ -697,12 +697,37 @@ function SAParents() {
 }
 
 function SAStudents() {
-  const { parents, orders, locations } = useApp();
+  const { parents, orders, locations, actions } = useApp();
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState("");
+  const [flash, setFlash] = useState("");
   const all = parents.flatMap(p => (p.children || []).map(c => ({ ...c, parentName: p.name, location: p.location })));
+
+  const removeStudent = async (c) => {
+    setError("");
+    const orderCount = orders.filter(o => o.childId === c.id).length;
+    const msg = orderCount > 0
+      ? `Delete ${c.name}? This will also remove ${orderCount} order${orderCount === 1 ? "" : "s"} and any repeat orders for this student. Cannot be undone.`
+      : `Delete ${c.name}? Cannot be undone.`;
+    if (!confirm(msg)) return;
+    setBusyId(c.id);
+    try {
+      await actions.deleteChild(c.id);
+      setFlash(`✓ Removed ${c.name}`);
+      setTimeout(() => setFlash(""), 2500);
+    } catch (err) {
+      setError(err.message || "Failed to delete student.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div>
       <div className="page-title">🎒 Students</div>
       <div className="page-subtitle">All enrolled students across locations.</div>
+      {flash && <div className="success-banner">{flash}</div>}
+      {error && <div style={{ background: "#FDEEF3", border: "1px solid #F5B8C9", borderRadius: "var(--radius-sm)", padding: "10px 14px", fontSize: 13, color: "var(--danger)", marginBottom: 16 }}>{error}</div>}
       <div className="stats-grid">
         {locations.map(loc => {
           const n = parents.filter(p => p.location === loc).reduce((s, p) => s + (p.children?.length || 0), 0);
@@ -712,14 +737,18 @@ function SAStudents() {
       <div className="card">
         {all.length === 0 ? <div className="empty-state"><div className="empty-icon">🎒</div><div className="empty-text">No students yet</div></div> : (
           <div className="table-wrap"><table>
-            <thead><tr><th>Student</th><th>Grade</th><th>Dietary</th><th>Parent</th><th>Location</th><th>Orders</th></tr></thead>
-            <tbody>{all.map(c => (
-              <tr key={c.id}><td style={{ fontWeight: 600 }}>{c.name}</td><td>{c.grade}</td>
-                <td>{hasDietary(c.dietary) ? <span className="tag tag-gold" style={{ maxWidth: 180, whiteSpace: "normal" }}>{formatDietary(c.dietary)}</span> : "—"}</td>
-                <td>{c.parentName}</td><td><span className="tag tag-teal" style={{ fontSize: 10 }}>{c.location?.split(" ")[0]}</span></td>
-                <td>{orders.filter(o => o.childId === c.id).length}</td>
-              </tr>
-            ))}</tbody>
+            <thead><tr><th>Student</th><th>Grade</th><th>Dietary</th><th>Parent</th><th>Location</th><th>Orders</th><th></th></tr></thead>
+            <tbody>{all.map(c => {
+              const orderCount = orders.filter(o => o.childId === c.id).length;
+              return (
+                <tr key={c.id}><td style={{ fontWeight: 600 }}>{c.name}</td><td>{c.grade}</td>
+                  <td>{hasDietary(c.dietary) ? <span className="tag tag-gold" style={{ maxWidth: 180, whiteSpace: "normal" }}>{formatDietary(c.dietary)}</span> : "—"}</td>
+                  <td>{c.parentName}</td><td><span className="tag tag-teal" style={{ fontSize: 10 }}>{c.location?.split(" ")[0]}</span></td>
+                  <td>{orderCount}</td>
+                  <td><button className="btn btn-danger btn-xs" onClick={() => removeStudent(c)} disabled={busyId === c.id}>{busyId === c.id ? "Removing…" : "Delete"}</button></td>
+                </tr>
+              );
+            })}</tbody>
           </table></div>
         )}
       </div>
