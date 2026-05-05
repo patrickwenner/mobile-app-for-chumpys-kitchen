@@ -300,18 +300,25 @@ function LoginScreen() {
 
 function RegisterScreen({ onBack }) {
   const { actions, locations } = useApp();
-  const [form, setForm] = useState({ name: "", email: "", password: "", phone: "", location: locations[0] || "" });
+  const [form, setForm] = useState({ first_name: "", last_name: "", email: "", password: "", phone: "", location: locations[0] || "" });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const submit = async () => {
     setError("");
-    if (!form.name || !form.email || !form.password) return setError("Please fill all required fields.");
+    if (!form.first_name.trim() || !form.last_name.trim()) return setError("First and last name are both required.");
+    if (!form.email || !form.password) return setError("Please fill all required fields.");
     if (!form.phone || !form.phone.trim()) return setError("A contact phone number is required.");
     if (!form.location) return setError("Please choose a location.");
     setSubmitting(true);
-    try { await actions.registerParent(form); }
+    try {
+      await actions.registerParent({
+        ...form,
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+      });
+    }
     catch (err) { setError(err.message || "Registration failed."); }
     finally { setSubmitting(false); }
   };
@@ -322,9 +329,10 @@ function RegisterScreen({ onBack }) {
         <div className="login-logo"><div className="login-logo-icon">🍱</div><div className="login-title">Create Account</div></div>
         {error && <div className="login-error">⚠️ {error}</div>}
         <div className="form-row">
-          <div className="form-group"><label className="form-label">Full Name *</label><input className="form-input" value={form.name} onChange={e => f("name", e.target.value)} /></div>
-          <div className="form-group"><label className="form-label">Phone *</label><input className="form-input" type="tel" value={form.phone} onChange={e => f("phone", e.target.value)} placeholder="555-123-4567" /></div>
+          <div className="form-group"><label className="form-label">First Name *</label><input className="form-input" value={form.first_name} onChange={e => f("first_name", e.target.value)} /></div>
+          <div className="form-group"><label className="form-label">Last Name *</label><input className="form-input" value={form.last_name} onChange={e => f("last_name", e.target.value)} /></div>
         </div>
+        <div className="form-group"><label className="form-label">Phone *</label><input className="form-input" type="tel" value={form.phone} onChange={e => f("phone", e.target.value)} placeholder="555-123-4567" /></div>
         <div className="form-group"><label className="form-label">Email *</label><input className="form-input" type="email" value={form.email} onChange={e => f("email", e.target.value)} /></div>
         <div className="form-group"><label className="form-label">Password *</label><input className="form-input" type="password" value={form.password} onChange={e => f("password", e.target.value)} /></div>
         <div className="form-group">
@@ -661,17 +669,27 @@ function SAParents() {
   const openEdit = (p) => {
     setError("");
     setEdit(p);
-    setEditForm({ name: p.name || "", phone: p.phone || "", location: p.location || "" });
+    setEditForm({
+      first_name: p.first_name || (p.name ? p.name.split(" ")[0] : ""),
+      last_name:  p.last_name  || (p.name ? p.name.split(" ").slice(1).join(" ") : ""),
+      phone: p.phone || "",
+      location: p.location || "",
+    });
   };
   const saveEdit = async () => {
     setError("");
-    if (!editForm.name.trim()) return setError("Name is required.");
+    if (!editForm.first_name.trim() || !editForm.last_name.trim()) return setError("First and last name are both required.");
     if (!editForm.phone.trim()) return setError("Phone is required for parents.");
     if (!editForm.location) return setError("Location is required.");
     setBusy(true);
     try {
-      await actions.updateProfile(edit.id, { name: editForm.name.trim(), phone: editForm.phone.trim(), location: editForm.location });
-      setFlash(`✓ Updated ${editForm.name.trim()}`);
+      await actions.updateProfile(edit.id, {
+        first_name: editForm.first_name.trim(),
+        last_name: editForm.last_name.trim(),
+        phone: editForm.phone.trim(),
+        location: editForm.location,
+      });
+      setFlash(`✓ Updated ${editForm.first_name.trim()} ${editForm.last_name.trim()}`);
       setTimeout(() => setFlash(""), 2500);
       setEdit(null);
     } catch (err) {
@@ -758,9 +776,15 @@ function SAParents() {
             <div className="modal-title">Edit Parent<button className="modal-close" onClick={() => !busy && setEdit(null)}>×</button></div>
             <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>Email is managed by Supabase Auth and isn't editable here. To change a parent's email, ask them to update it in their profile or remove and re-invite the account.</div>
             {error && <div style={{ background: "#FDEEF3", border: "1px solid #F5B8C9", borderRadius: "var(--radius-sm)", padding: "10px 14px", fontSize: 13, color: "var(--danger)", marginBottom: 12 }}>{error}</div>}
-            <div className="form-group">
-              <label className="form-label">Name</label>
-              <input className="form-input" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">First Name *</label>
+                <input className="form-input" value={editForm.first_name} onChange={e => setEditForm({ ...editForm, first_name: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Last Name *</label>
+                <input className="form-input" value={editForm.last_name} onChange={e => setEditForm({ ...editForm, last_name: e.target.value })} />
+              </div>
             </div>
             <div className="form-group">
               <label className="form-label">Email <span style={{ fontWeight: 400, textTransform: "none", color: "var(--text3)" }}>(read-only)</span></label>
@@ -792,8 +816,7 @@ function SAStudents() {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
-  const [parentView, setParentView] = useState(null);
-  const all = parents.flatMap(p => (p.children || []).map(c => ({ ...c, parentId: p.id, parentName: p.name, location: p.location })));
+  const all = parents.flatMap(p => (p.children || []).map(c => ({ ...c, parentName: p.name, location: p.location })));
 
   const removeStudent = async (c) => {
     setError("");
@@ -812,11 +835,6 @@ function SAStudents() {
     } finally {
       setBusyId(null);
     }
-  };
-
-  const openParent = (parentId) => {
-    const p = parents.find(x => x.id === parentId);
-    if (p) setParentView(p);
   };
 
   return (
@@ -842,42 +860,13 @@ function SAStudents() {
                   <td>{hasDietary(c.dietary) ? <span className="tag tag-gold" style={{ maxWidth: 180, whiteSpace: "normal" }}>{formatDietary(c.dietary)}</span> : "—"}</td>
                   <td>{c.parentName}</td><td><span className="tag tag-teal" style={{ fontSize: 10 }}>{c.location?.split(" ")[0]}</span></td>
                   <td>{orderCount}</td>
-                  <td style={{ whiteSpace: "nowrap" }}>
-                    <button className="btn btn-secondary btn-xs" onClick={() => openParent(c.parentId)} style={{ marginRight: 4 }}>Parent</button>
-                    <button className="btn btn-danger btn-xs" onClick={() => removeStudent(c)} disabled={busyId === c.id}>{busyId === c.id ? "Removing…" : "Delete"}</button>
-                  </td>
+                  <td><button className="btn btn-danger btn-xs" onClick={() => removeStudent(c)} disabled={busyId === c.id}>{busyId === c.id ? "Removing…" : "Delete"}</button></td>
                 </tr>
               );
             })}</tbody>
           </table></div>
         )}
       </div>
-
-      {parentView && (
-        <div className="modal-overlay" onClick={() => setParentView(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{parentView.name}<button className="modal-close" onClick={() => setParentView(null)}>×</button></div>
-            <div className="grid2">
-              <div><b>Email</b><br /><span style={{ fontSize: 13 }}>{parentView.email ? <a href={`mailto:${parentView.email}`} style={{ color: "var(--secondary)", textDecoration: "none" }}>{parentView.email}</a> : "N/A"}</span></div>
-              <div><b>Phone</b><br /><span style={{ fontSize: 13 }}>{parentView.phone ? <a href={`tel:${parentView.phone}`} style={{ color: "var(--secondary)", textDecoration: "none" }}>{parentView.phone}</a> : "N/A"}</span></div>
-              <div><b>Location</b><br /><span style={{ fontSize: 13 }}>{parentView.location}</span></div>
-              <div><b>Account Created</b><br /><span style={{ fontSize: 13 }}>{parentView.created_at ? formatDate(parentView.created_at.slice(0, 10)) : "—"}</span></div>
-            </div>
-            <div className="divider" />
-            <b>Children</b>
-            {(parentView.children || []).map(c => <div key={c.id} className="child-card" style={{ marginTop: 8 }}><b>{c.name}</b><div style={{ fontSize: 12, color: "var(--text2)" }}>{c.grade} • {formatDietary(c.dietary)}</div></div>)}
-            {(!parentView.children || parentView.children.length === 0) && <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 8 }}>No children added.</div>}
-            <div className="divider" />
-            <b>Recent Orders</b>
-            {orders.filter(o => o.parentId === parentView.id).slice(-5).map(o => (
-              <div key={o.id} style={{ fontSize: 13, padding: "5px 0", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
-                <span>{formatDate(o.date)} — {o.childName}</span><span style={{ color: "var(--text2)" }}>{o.mainItem} (${(o.price || 0).toFixed(2)})</span>
-              </div>
-            ))}
-            <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 12, textAlign: "right" }}>For full edit/reset access, open the Parents page.</div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1431,54 +1420,31 @@ function SchoolWeekly() {
 }
 
 function SchoolStudents() {
-  const { profile, orders, parents } = useApp();
-  const [parentView, setParentView] = useState(null);
+  const { profile, orders } = useApp();
   const seen = new Map();
   for (const o of orders.filter(x => x.location === profile.location)) {
     if (!seen.has(o.childId)) {
-      seen.set(o.childId, { id: o.childId, name: o.childName, grade: o.childGrade, parentId: o.parentId, parentName: o.parentName, dietary: o.dietary, orderCount: 1 });
+      seen.set(o.childId, { id: o.childId, name: o.childName, grade: o.childGrade, parentName: o.parentName, dietary: o.dietary, orderCount: 1 });
     } else { seen.get(o.childId).orderCount++; }
   }
   const students = [...seen.values()].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-  const openParent = (parentId) => {
-    const p = parents.find(x => x.id === parentId);
-    if (p) setParentView(p);
-  };
   return (
     <div>
       <div className="page-title">🎒 My Students</div><div className="page-subtitle">{profile.location} · {students.length} student{students.length !== 1 ? "s" : ""} with orders</div>
       <div className="card">
         {students.length === 0 ? <div className="empty-state"><div className="empty-icon">🎒</div><div className="empty-text">No student orders yet</div></div> : (
           <div className="table-wrap"><table>
-            <thead><tr><th>Student</th><th>Grade</th><th>Dietary</th><th>Parent</th><th>Orders</th><th></th></tr></thead>
+            <thead><tr><th>Student</th><th>Grade</th><th>Dietary</th><th>Parent</th><th>Orders</th></tr></thead>
             <tbody>{students.map(c => (
               <tr key={c.id}>
                 <td style={{ fontWeight: 600 }}>{c.name}</td><td>{c.grade}</td>
                 <td>{hasDietary(c.dietary) ? <span className="tag tag-gold" style={{ maxWidth: 180, whiteSpace: "normal" }}>{formatDietary(c.dietary)}</span> : "—"}</td>
                 <td>{c.parentName}</td><td>{c.orderCount}</td>
-                <td><button className="btn btn-secondary btn-xs" onClick={() => openParent(c.parentId)} disabled={!parents.find(p => p.id === c.parentId)}>Parent</button></td>
               </tr>
             ))}</tbody>
           </table></div>
         )}
       </div>
-
-      {parentView && (
-        <div className="modal-overlay" onClick={() => setParentView(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{parentView.name}<button className="modal-close" onClick={() => setParentView(null)}>×</button></div>
-            <div className="grid2">
-              <div><b>Email</b><br /><span style={{ fontSize: 13 }}>{parentView.email ? <a href={`mailto:${parentView.email}`} style={{ color: "var(--secondary)", textDecoration: "none" }}>{parentView.email}</a> : "N/A"}</span></div>
-              <div><b>Phone</b><br /><span style={{ fontSize: 13 }}>{parentView.phone ? <a href={`tel:${parentView.phone}`} style={{ color: "var(--secondary)", textDecoration: "none" }}>{parentView.phone}</a> : "N/A"}</span></div>
-            </div>
-            <div className="divider" />
-            <b>Children</b>
-            {(parentView.children || []).map(c => <div key={c.id} className="child-card" style={{ marginTop: 8 }}><b>{c.name}</b><div style={{ fontSize: 12, color: "var(--text2)" }}>{c.grade} • {formatDietary(c.dietary)}</div></div>)}
-            {(!parentView.children || parentView.children.length === 0) && <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 8 }}>No children added.</div>}
-            <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 12, textAlign: "right" }}>Read-only — contact the parent directly using the email or phone above.</div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -1946,17 +1912,27 @@ function ParentMyOrders() {
 
 function ParentProfile() {
   const { profile, children, locations, repeatOrders, actions } = useApp();
-  const [form, setForm] = useState({ name: profile.name, phone: profile.phone || "", location: profile.location || "" });
+  const [form, setForm] = useState({
+    first_name: profile.first_name || (profile.name ? profile.name.split(" ")[0] : ""),
+    last_name:  profile.last_name  || (profile.name ? profile.name.split(" ").slice(1).join(" ") : ""),
+    phone: profile.phone || "",
+    location: profile.location || "",
+  });
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const save = async () => {
     setError("");
-    if (!form.name?.trim()) return setError("Name cannot be empty.");
+    if (!form.first_name?.trim() || !form.last_name?.trim()) return setError("First and last name are both required.");
     if (!form.phone?.trim()) return setError("A contact phone number is required.");
     setBusy(true);
     try {
-      await actions.updateProfile(profile.id, form);
+      await actions.updateProfile(profile.id, {
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        phone: form.phone.trim(),
+        location: form.location,
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) { setError(err.message || "Failed to save profile."); }
@@ -1977,9 +1953,10 @@ function ParentProfile() {
       {error && <div className="login-error">⚠️ {error}</div>}
       <div className="card" style={{ maxWidth: 560 }}>
         <div className="form-row">
-          <div className="form-group"><label className="form-label">Full Name *</label><input className="form-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
-          <div className="form-group"><label className="form-label">Phone *</label><input className="form-input" type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="555-123-4567" /></div>
+          <div className="form-group"><label className="form-label">First Name *</label><input className="form-input" value={form.first_name} onChange={e => setForm(f => ({ ...f, first_name: e.target.value }))} /></div>
+          <div className="form-group"><label className="form-label">Last Name *</label><input className="form-input" value={form.last_name} onChange={e => setForm(f => ({ ...f, last_name: e.target.value }))} /></div>
         </div>
+        <div className="form-group"><label className="form-label">Phone *</label><input className="form-input" type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="555-123-4567" /></div>
         <div className="form-group"><label className="form-label">Email</label><input className="form-input" type="email" value={profile.email || ""} disabled /></div>
         <div className="form-group">
           <label className="form-label">Location</label>
