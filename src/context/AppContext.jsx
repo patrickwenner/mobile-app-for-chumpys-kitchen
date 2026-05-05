@@ -159,8 +159,13 @@ export function AppProvider({ children }) {
         setMyChildren(childrenData.map(normalizeChild));
         setRepeatOrders(repeatData);
       } else if (prof.role === "schooladmin") {
-        const ordersData = await getOrders({ location: prof.location });
+        const [ordersData, parentsData] = await Promise.all([
+          getOrders({ location: prof.location }),
+          getAllParents(),
+        ]);
         setOrders(ordersData.map(normalizeOrder));
+        // Scope parents to this school admin's location
+        setParents(parentsData.map(normalizeProfile).filter(p => p.location === prof.location));
       } else if (prof.role === "superadmin") {
         const [ordersData, parentsData] = await Promise.all([
           getOrders(),
@@ -221,9 +226,10 @@ export function AppProvider({ children }) {
   }, [profile]);
 
   const refreshParents = useCallback(async () => {
-    if (profile?.role !== "superadmin") return;
+    if (!profile || (profile.role !== "superadmin" && profile.role !== "schooladmin")) return;
     const data = await getAllParents();
-    setParents(data.map(normalizeProfile));
+    const all = data.map(normalizeProfile);
+    setParents(profile.role === "schooladmin" ? all.filter(p => p.location === profile.location) : all);
   }, [profile]);
 
   const refreshChildren = useCallback(async () => {
