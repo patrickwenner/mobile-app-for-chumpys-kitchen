@@ -17,10 +17,14 @@ export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
 }
-export async function registerParent({ name, email, password, phone, location }) {
+export async function registerParent({ first_name, last_name, name, email, password, phone, location }) {
+  // Backwards-compat: accept either { first_name, last_name } or a single { name }.
+  const first = first_name ?? (name ? name.trim().split(/\s+/)[0] : "");
+  const last  = last_name  ?? (name ? name.trim().split(/\s+/).slice(1).join(" ") : "");
+  const fullName = `${first} ${last}`.trim();
   const { data, error } = await supabase.auth.signUp({
     email, password,
-    options: { data: { name, phone, location, role: "parent" } },
+    options: { data: { name: fullName, first_name: first, last_name: last, phone, location, role: "parent" } },
   });
   if (error) throw error;
   return data;
@@ -46,13 +50,6 @@ export async function updateProfile(id, updates) {
 }
 export async function deleteParent(id) {
   const { error } = await supabase.from("profiles").delete().eq("id", id);
-  if (error) throw error;
-}
-
-// Send a password-reset email. Standard Supabase auth flow.
-export async function sendPasswordReset(email) {
-  const redirectTo = `${window.location.origin}/`;
-  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
   if (error) throw error;
 }
 
