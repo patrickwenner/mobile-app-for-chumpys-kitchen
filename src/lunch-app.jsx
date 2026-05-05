@@ -752,16 +752,21 @@ function ReportPanel({ orders, parents, locations, scopedToLocation = null }) {
     rows.length === 0
       ? <div className="empty-state" style={{ padding: "24px" }}><div className="empty-icon" style={{ fontSize: 32 }}>📭</div><div className="empty-text">No orders</div></div>
       : <div className="table-wrap"><table>
-        <thead><tr>{showDate && <th>Date</th>}<th>Student</th><th>Location</th><th>Food</th><th>Drink</th><th>Price</th></tr></thead>
-        <tbody>{rows.map(o => (
-          <tr key={o.id}>
-            {showDate && <td>{formatDate(o.date)}</td>}
-            <td style={{ fontWeight: 600 }}>{o.childName}<br /><span style={{ fontSize: 11, color: "var(--text3)" }}>{o.childGrade}</span></td>
-            <td><span className="tag tag-teal" style={{ fontSize: 10 }}>{o.location?.split(" ")[0]}</span></td>
-            <td>{o.mainItem}</td><td>{o.drink}</td>
-            <td style={{ fontWeight: 700, color: "var(--primary)" }}>${(o.price || 0).toFixed(2)}</td>
-          </tr>
-        ))}</tbody>
+        <thead><tr>{showDate && <th>Date</th>}<th>Student</th><th>Location</th><th>Food</th><th>Drink</th><th>Dietary</th><th>Price</th></tr></thead>
+        <tbody>{rows.map(o => {
+          const d = formatDietary(o.dietary);
+          const has = hasDietary(o.dietary);
+          return (
+            <tr key={o.id}>
+              {showDate && <td>{formatDate(o.date)}</td>}
+              <td style={{ fontWeight: 600 }}>{o.childName}<br /><span style={{ fontSize: 11, color: "var(--text3)" }}>{o.childGrade}</span></td>
+              <td><span className="tag tag-teal" style={{ fontSize: 10 }}>{o.location?.split(" ")[0]}</span></td>
+              <td>{o.mainItem}</td><td>{o.drink}</td>
+              <td style={{ fontSize: 12, fontWeight: has ? 700 : 400, color: has ? "var(--danger)" : "var(--text3)", maxWidth: 220 }}>{d}</td>
+              <td style={{ fontWeight: 700, color: "var(--primary)" }}>${(o.price || 0).toFixed(2)}</td>
+            </tr>
+          );
+        })}</tbody>
       </table></div>
   );
 
@@ -779,10 +784,21 @@ function ReportPanel({ orders, parents, locations, scopedToLocation = null }) {
     );
   };
 
+  const tabLabel = { daily: "Daily", weekly: "Weekly", monthly: "Monthly" }[tab] || "";
+  const printTitle = `Lunchbox by Chumpys Kitchen — ${tabLabel} Report${filterLoc !== "All" ? ` — ${filterLoc}` : ""}`;
+  const handlePrint = () => window.print();
+
   return (
     <div>
-      <div className="page-title">📈 Reports</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 4, flexWrap: "wrap" }}>
+      <div className="print-header" style={{ marginBottom: 16 }}>
+        <div style={{ fontFamily: "'Nunito',sans-serif", fontWeight: 900, fontSize: 22, color: "#1A1A2E" }}>{printTitle}</div>
+        <div style={{ fontSize: 12, color: "#5A5A7A" }}>Printed {new Date().toLocaleString("en-US", { dateStyle: "long", timeStyle: "short" })}</div>
+      </div>
+      <div className="flex-between no-print" style={{ alignItems: "flex-start", marginBottom: 4 }}>
+        <div className="page-title">📈 Reports</div>
+        <button className="btn btn-secondary" onClick={handlePrint} style={{ marginTop: 4 }}>🖨️ Click to Print</button>
+      </div>
+      <div className="no-print" style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 4, flexWrap: "wrap" }}>
         <ReportTabs tab={tab} setTab={setTab} />
         {!scopedToLocation && (
           <div style={{ marginBottom: 20 }}>
@@ -1923,31 +1939,4 @@ function DietaryPicker({ value, onChange }) {
                 borderColor: active ? "var(--primary)" : "var(--border)",
               }}>
               {active && <span style={{ fontSize: 11 }}>✓</span>}
-              {opt}
-            </button>
-          );
-        })}
-        <button type="button" onClick={toggleOther}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "6px 14px", borderRadius: 20, fontSize: 13, fontWeight: 600,
-            cursor: "pointer", border: "1.5px solid", transition: "all 0.15s",
-            background: showOther ? "var(--secondary)" : "var(--surface)",
-            color: showOther ? "white" : "var(--text2)",
-            borderColor: showOther ? "var(--secondary)" : "var(--border)",
-          }}>
-          {showOther && <span style={{ fontSize: 11 }}>✓</span>}
-          Other / Not Listed
-        </button>
-      </div>
-      {showOther && (
-        <div style={{ marginTop: 8 }}>
-          <input className="form-input" placeholder="Please describe the restriction(s)…" value={val.otherDetails || ""} onChange={e => setOther(e.target.value)} />
-        </div>
-      )}
-      {(val.selected.length === 0) && (
-        <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 6 }}>No restrictions selected — child has no dietary restrictions.</div>
-      )}
-    </div>
-  );
-}
+       
